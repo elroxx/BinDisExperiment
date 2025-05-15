@@ -10,8 +10,8 @@ disparity_pixels = 10  # Horizontal shift between left and right eye views
 # setting up window
 win = visual.Window(size=win_size, color='black', units='pix')
 
-# canvas for PIL
-img_size = win_size[::-1]  # PIL uses (height, width)
+# PIL
+img_size = win_size[::-1]  # PIL
 
 # left/right images
 def generate_eye_images(disparity):
