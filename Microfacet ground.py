@@ -1,5 +1,6 @@
 from psychopy import visual, core, event
 from pyglet.gl import *
+import random
 
 #HAVE TO FIX THE GROUND TEXTURE FOR THE MICROFACETS STUFF IN THE REFLECTION
 class SpecularStreakScene:
@@ -28,10 +29,10 @@ class SpecularStreakScene:
 
     def setup_lighting(self):
         # center far like sun
-        light_pos = (GLfloat * 4)(0.0, 8.0, -50.0, 1.0)  # point light (width=1 so there is technically a width)
+        light_pos = (GLfloat * 4)(0.0, 8.0, -40.0, 1.0)  # point light (width=1 so there is technically a width)
 
         # Light properties (white light for B&W scene)
-        light_ambient = (GLfloat * 4)(0.1, 0.1, 0.1, 1.0)
+        light_ambient = (GLfloat * 4)(0.01, 0.01, 0.01, 1.0)
         light_diffuse = (GLfloat * 4)(0.8, 0.8, 0.8, 1.0)
         light_specular = (GLfloat * 4)(1.0, 1.0, 1.0, 1.0)
 
@@ -57,29 +58,36 @@ class SpecularStreakScene:
                   0.0, 1.0, 0.0)  # Up vector
 
     def create_glossy_floor(self):
-        # state for lit geometry
+        # Enable lighting and depth test
         glEnable(GL_LIGHTING)
         glEnable(GL_LIGHT0)
         glEnable(GL_DEPTH_TEST)
 
         # MATERIAL PROPERTY FOR LIGHT REFLECTION
-        mat_ambient = (GLfloat * 4)(0.1, 0.1, 0.1, 1.0)  # Darker ambient
-        mat_diffuse = (GLfloat * 4)(0.2, 0.2, 0.2, 1.0)  # Darker diffuse
+        mat_ambient = (GLfloat * 4)(0.01, 0.01, 0.01, 0.01)  # Darker ambient
+        mat_diffuse = (GLfloat * 4)(0.02, 0.02, 0.02, 1.0)  # Darker diffuse
         mat_specular = (GLfloat * 4)(1.0, 1.0, 1.0, 1.0)  # Bright specular
-        mat_shininess = (GLfloat * 1)(128.0)  # Higher shininess
+        mat_shininess = (GLfloat * 1)(128.0)  # Higher shininess for sharp highlights
 
         glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, mat_ambient)
         glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, mat_diffuse)
         glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, mat_specular)
         glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, mat_shininess)
 
-        # reset color white
-        glColor3f(1.0, 1.0, 1.0)
+        glColor3f(1.0, 1.0, 1.0)  # Reset color
 
-        #tesselation of floor for division/light computation
-        floor_size = 40.0  # Larger floor
-        divisions = 120  # More tessellation for smoother specular
+        # Tessellation parameters
+        floor_size = 40.0
+        divisions = 120
         step = floor_size / divisions
+
+        def jittered_normal():
+            nx = random.uniform(-0.3, 0.3)
+            ny = 1.0
+            nz = random.uniform(-0.05, 0.05)  # Less variation in Z
+            # Normalize the perturbed normal
+            length = (nx ** 2 + ny ** 2 + nz ** 2) ** 0.5
+            return (nx / length, ny / length, nz / length)
 
         glBegin(GL_TRIANGLES)
 
@@ -90,21 +98,19 @@ class SpecularStreakScene:
                 z1 = -floor_size / 2 + j * step
                 z2 = z1 + step
 
-                # normal vector
-                glNormal3f(0.0, 1.0, 0.0)
-
                 # Triangle 1
-                glVertex3f(x1, 0.0, z1)
-                glVertex3f(x2, 0.0, z1)
-                glVertex3f(x1, 0.0, z2)
+                for (x, z) in [(x1, z1), (x2, z1), (x1, z2)]:
+                    nx, ny, nz = jittered_normal()
+                    glNormal3f(nx, ny, nz)
+                    glVertex3f(x, 0.0, z)
 
                 # Triangle 2
-                glVertex3f(x2, 0.0, z1)
-                glVertex3f(x2, 0.0, z2)
-                glVertex3f(x1, 0.0, z2)
+                for (x, z) in [(x2, z1), (x2, z2), (x1, z2)]:
+                    nx, ny, nz = jittered_normal()
+                    glNormal3f(nx, ny, nz)
+                    glVertex3f(x, 0.0, z)
 
         glEnd()
-
 
     def render_frame(self):
         #render 1 frame but its always 1 frame anyway coz no movement
