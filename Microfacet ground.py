@@ -31,7 +31,7 @@ class SpecularStreakScene:
         # center far like sun
         light_pos = (GLfloat * 4)(0.0, 8.0, -40.0, 1.0)  # point light (width=1 so there is technically a width)
 
-        # Light properties (white light for B&W scene)
+
         light_ambient = (GLfloat * 4)(0.01, 0.01, 0.01, 1.0)
         light_diffuse = (GLfloat * 4)(0.8, 0.8, 0.8, 1.0)
         light_specular = (GLfloat * 4)(1.0, 1.0, 1.0, 1.0)
@@ -159,13 +159,11 @@ def run_specular_scene():
         print("Window created successfully")
         print("Initializing OpenGL scene...")
 
-        # Create the scene
+        # scene
         scene = SpecularStreakScene(win)
 
         print("Specular Streaks Scene initialized")
         print("Press ESC or Q to exit, SPACE to continue")
-        print("The scene shows a distant point light creating specular streaks on a glossy floor")
-        print("Similar to sunset reflections on water, rendered in black and white")
 
         # user input to start coz weird bug ?
         print("Press SPACE to start the scene...")
