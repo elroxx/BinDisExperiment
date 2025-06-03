@@ -2,7 +2,7 @@ from psychopy import visual, core, event
 from pyglet.gl import *
 import random
 
-
+#HYPERPARAMETERS TO TOUCH ARE LIGHT DISTANCE AND SPECIFIC RANDOMIZATION
 class SpecularStreakScene:
     def __init__(self, win):
         self.win = win
@@ -33,9 +33,10 @@ class SpecularStreakScene:
 
     def setup_lighting(self):
         # center far like sun
-        light_pos = (GLfloat * 4)(0.0, 8.0, -40.0, 1.0)  # point light
+        light_pos = (GLfloat * 4)(0.0, 4.0, -100.0, 1.0)  # point light. Weirdly, at -100 it does a column but at -500 it goes in all directions
+        #what I think it might be: reflection is normalized???
 
-        # Light properties (white light for B&W scene)
+        # Light properties
         light_ambient = (GLfloat * 4)(0.01, 0.01, 0.01, 1.0)
         light_diffuse = (GLfloat * 4)(0.8, 0.8, 0.8, 1.0)
         light_specular = (GLfloat * 4)(1.0, 1.0, 1.0, 1.0)
@@ -64,20 +65,28 @@ class SpecularStreakScene:
     def generate_floor_geometry(self):
         # Tessellation parameters
         floor_size = 40.0
-        divisions = 100
+        #divisions = 100
+        divisions = 250
         step = floor_size / divisions
 
         # Store vertices and normals
         self.floor_vertices = []
         self.floor_normals = []
 
-        def jittered_normal():
-            nx = random.uniform(-0.7, 0.7)
+        """def jittered_normal():
+            nx = random.uniform(-0.3, 0.3)
             ny = 1.0
             nz = random.uniform(-0.05, 0.05)  # little variation in x but not in z
             # normalize
             length = (nx ** 2 + ny ** 2 + nz ** 2) ** 0.5
-            return (nx / length, ny / length, nz / length)
+            return (nx / length, ny / length, nz / length)"""
+
+        def jittered_normal():
+            nx = random.gauss(0.0, 0.05) #increasing standard deviation makes streak more wide ??
+            ny = 1.0
+            nz = 0.0  # perfectly vertical streaks changing the z makes a more conical streak?
+            length = (nx ** 2 + ny ** 2) ** 0.5
+            return (nx / length, ny / length, 0.0)
 
         for i in range(divisions):
             for j in range(divisions):
