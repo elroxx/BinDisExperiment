@@ -72,7 +72,7 @@ class SpecularStreakScene:
         self.floor_normals = []
 
         def jittered_normal():
-            nx = random.uniform(-0.3, 0.3)
+            nx = random.uniform(-0.7, 0.7)
             ny = 1.0
             nz = random.uniform(-0.05, 0.05)  # little variation in x but not in z
             # normalize
@@ -99,6 +99,53 @@ class SpecularStreakScene:
                 self.floor_vertices.extend(triangle2_vertices)
                 self.floor_normals.extend(triangle1_normals)
                 self.floor_normals.extend(triangle2_normals)
+
+    """def generate_floor_geometry(self):
+        # Tessellation parameters
+        floor_size = 40.0
+        divisions = 100
+        step = floor_size / divisions
+
+        # Store vertices and normals
+        self.floor_vertices = []
+        self.floor_normals = []
+
+        def jittered_normal():
+            nx = random.uniform(-0.7, 0.7)
+            ny = 1.0
+            nz = random.uniform(-0.07, 0.07)  # small streak bias
+            length = (nx ** 2 + ny ** 2 + nz ** 2) ** 0.5
+            return (nx / length, ny / length, nz / length)
+
+        for i in range(divisions):
+            for j in range(divisions):
+                x1 = -floor_size / 2 + i * step
+                x2 = x1 + step
+                z1 = -floor_size / 2 + j * step
+                z2 = z1 + step
+
+                # Random elevation values for each vertex (small perturbation)
+                y1 = random.uniform(-0.01, 0.01)
+                y2 = random.uniform(-0.01, 0.01)
+                y3 = random.uniform(-0.01, 0.01)
+                y4 = random.uniform(-0.01, 0.01)
+                y5 = random.uniform(-0.01, 0.01)
+                y6 = random.uniform(-0.01, 0.01)
+
+                # Triangle 1
+                triangle1_vertices = [(x1, y1, z1), (x2, y2, z1), (x1, y3, z2)]
+                triangle1_normals = [jittered_normal() for _ in range(3)]
+
+                # Triangle 2
+                triangle2_vertices = [(x2, y4, z1), (x2, y5, z2), (x1, y6, z2)]
+                triangle2_normals = [jittered_normal() for _ in range(3)]
+
+                # Append
+                self.floor_vertices.extend(triangle1_vertices)
+                self.floor_vertices.extend(triangle2_vertices)
+                self.floor_normals.extend(triangle1_normals)
+                self.floor_normals.extend(triangle2_normals)
+                """
 
     def render_glossy_floor(self):
         #pre gen geometry this time
