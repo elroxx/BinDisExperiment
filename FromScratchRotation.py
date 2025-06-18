@@ -12,15 +12,22 @@ class SpecularStreakScene:
         self.setup_opengl()
         print("Setting up custom lighting...")
         self.setup_custom_lighting()
-        print("Generating floor geometry...")
-        self.generate_floor_geometry()
-        print("Scene initialization complete")
+
+        # Initialize angles first
         self.angle_x = 0  # Rotation X
         self.angle_z = 0  # Rotation Z
 
+        # Store original positions for transformation
+        self.original_light_pos = np.array([0.0, 1.0, -100.0])
+        self.original_camera_pos = np.array([0.0, 1.5, 0.0])
+
+        print("Generating floor geometry...")
+        self.generate_floor_geometry()
+        print("Scene initialization complete")
+
     def setup_opengl(self):
         glEnable(GL_DEPTH_TEST)
-        #DISABLED LIGHTNING TO DO A CUSTOM MODEL
+        # DISABLED LIGHTNING TO DO A CUSTOM MODEL
         glDisable(GL_LIGHTING)
         glDisable(GL_LIGHT0)
 
@@ -48,15 +55,51 @@ class SpecularStreakScene:
         # properties for light
         self.light = {
             'ambient': np.array([0.02, 0.02, 0.02]),
-            'diffuse': np.array([0.1, 0.1, 0.1]),
+            'diffuse': np.array([0, 0, 0]),
             'specular': np.array([1.0, 1.0, 1.0])
         }
 
         # Lighting model selection
         self.use_ward = False
 
+    def get_rotation_matrix_x(self, angle_deg):
+        angle_rad = math.radians(angle_deg)
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+        return np.array([
+            [1, 0, 0],
+            [0, cos_a, -sin_a],
+            [0, sin_a, cos_a]
+        ])
+
+    def get_rotation_matrix_z(self, angle_deg):
+        angle_rad = math.radians(angle_deg)
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+        return np.array([
+            [cos_a, -sin_a, 0],
+            [sin_a, cos_a, 0],
+            [0, 0, 1]
+        ])
+
+    def get_inverse_rotation_matrix(self):
+        #inverse rotation for current angles
+        rot_z = self.get_rotation_matrix_z(-self.angle_z)
+        rot_x = self.get_rotation_matrix_x(-self.angle_x)
+        return np.dot(rot_z, rot_x)
+
+    def update_lighting_positions(self):
+        # Get inverse rotation matrix to transform light and camera positions
+        inv_rotation = self.get_inverse_rotation_matrix()
+
+        # Transform light position (apply inverse rotation)
+        self.light_pos = np.dot(inv_rotation, self.original_light_pos)
+
+        # Transform camera position (apply inverse rotation)
+        self.camera_pos = np.dot(inv_rotation, self.original_camera_pos)
+
     def normalize(self, v):
-        #normalize vector + avoiding div by 0
+        # normalize vector + avoiding div by 0
         norm = np.linalg.norm(v)
         if norm < 1e-8:  # if very small vector
             return np.array([0.0, 1.0, 0.0])  # it defaults to up vector
@@ -70,13 +113,13 @@ class SpecularStreakScene:
         # vectors
         light_dir = self.normalize(light_pos - pos)
         view_dir = self.normalize(view_pos - pos)
-        half_vector = self.normalize(light_dir + view_dir) #half angle vec
+        half_vector = self.normalize(light_dir + view_dir)  # half angle vec
 
         # light components
         ambient = self.material['ambient'] * self.light['ambient']
         n_dot_l = max(0.0, np.dot(n, light_dir))
         diffuse = self.material['diffuse'] * self.light['diffuse'] * n_dot_l
-        n_dot_h = max(0.0, np.dot(n, half_vector)) #specular blinn phong
+        n_dot_h = max(0.0, np.dot(n, half_vector))  # specular blinn phong
         spec_power = n_dot_h ** self.material['shininess']
         specular = self.material['specular'] * self.light['specular'] * spec_power
 
@@ -141,29 +184,35 @@ class SpecularStreakScene:
         return np.clip(color, 0.0, 1.0)
 
     def generate_floor_geometry(self):
+        # Update lighting positions based on current rotation
+        self.update_lighting_positions()
+
         # floor params
-        floor_size = 40.0
-        divisions = 200
-        step = floor_size / divisions
+        floor_size_z = 40.0
+        floor_size_x = 40.0
+        divisions_x = 100
+        divisions_z = 100
+        step_x = floor_size_x / divisions_x
+        step_z = floor_size_z / divisions_z
 
         self.floor_vertices = []
         self.floor_normals = []
         self.floor_colors = []
 
         def jittered_normal():
-            nx = random.gauss(0.0, 0)
+            nx = random.gauss(0.0, 0.1)
             ny = 1.0
-            nz = random.gauss(0.0, 0)  #I can play with variation
+            nz = random.gauss(0.0, 0.02)  # I can play with variation
             length = math.sqrt(nx * nx + ny * ny + nz * nz)
             return (nx / length, ny / length, nz / length)
 
         # plane
-        for i in range(divisions):
-            for j in range(divisions):
-                x1 = -floor_size / 2 + i * step
-                x2 = x1 + step
-                z1 = -floor_size / 2 + j * step
-                z2 = z1 + step
+        for i in range(divisions_x):
+            for j in range(divisions_z):
+                x1 = -floor_size_x / 2 + i * step_x
+                x2 = x1 + step_x
+                z1 = -floor_size_z / 2 + j * step_z
+                z2 = z1 + step_z
 
                 # Triangle 1
                 v1 = (x1, 0.0, z1)
@@ -243,7 +292,7 @@ class SpecularStreakScene:
 
     def update_lighting_params(self, light_height=None, roughness=None, shininess=None):
         if light_height is not None:
-            self.light_pos[1] = light_height
+            self.original_light_pos[1] = light_height
         if roughness is not None:
             self.material['roughness'] = roughness
         if shininess is not None:
@@ -252,8 +301,21 @@ class SpecularStreakScene:
         #  geo if changing model
         model_name = "Ward BRDF" if self.use_ward else "Blinn-Phong"
         print(
-            f"Updating lighting ({model_name}): height={self.light_pos[1]:.1f}, Z={self.light_pos[2]:.1f}, roughness={self.material['roughness']:.3f}, shininess={self.material['shininess']:.1f}")
+            f"Updating lighting ({model_name}): height={self.original_light_pos[1]:.1f}, Z={self.original_light_pos[2]:.1f}, roughness={self.material['roughness']:.3f}, shininess={self.material['shininess']:.1f}")
         self.generate_floor_geometry()
+
+    def update_angles(self, delta_x=0, delta_z=0):
+        """Update rotation angles and regenerate geometry if needed"""
+        old_angle_x = self.angle_x
+        old_angle_z = self.angle_z
+
+        self.angle_x += delta_x
+        self.angle_z += delta_z
+
+        # Only regenerate if angles actually changed
+        if self.angle_x != old_angle_x or self.angle_z != old_angle_z:
+            print(f"Rotation updated - X: {self.angle_x}, Z: {self.angle_z}")
+            self.generate_floor_geometry()
 
     def render_frame(self):
         try:
@@ -304,7 +366,7 @@ def run_specular_scene():
 
         print("Controls:")
         print("SPACE - Start scene")
-        print("Arrow keys - Rotate view")
+        print("Arrow keys - Rotate view (automatically recomputes lighting)")
         print("1/2 - Adjust light height")
         print("3/4 - Adjust surface roughness")
         print("5/6 - Adjust shininess")
@@ -324,25 +386,21 @@ def run_specular_scene():
                 print("Exiting...")
                 break
 
-            # View controls
+            # View controls - now properly updates lighting
             if 'left' in keys:
-                scene.angle_z -= 10
-                print(f"Rotation Z: {scene.angle_z}")
+                scene.update_angles(delta_z=-10)
             if 'right' in keys:
-                scene.angle_z += 10
-                print(f"Rotation Z: {scene.angle_z}")
+                scene.update_angles(delta_z=10)
             if 'up' in keys:
-                scene.angle_x -= 1
-                print(f"Rotation X: {scene.angle_x}")
+                scene.update_angles(delta_x=-1)
             if 'down' in keys:
-                scene.angle_x += 1
-                print(f"Rotation X: {scene.angle_x}")
+                scene.update_angles(delta_x=1)
 
             # Lighting parameter controls
             if '1' in keys:
-                scene.update_lighting_params(light_height=scene.light_pos[1] + 2)
+                scene.update_lighting_params(light_height=scene.original_light_pos[1] + 2)
             if '2' in keys:
-                scene.update_lighting_params(light_height=scene.light_pos[1] - 2)
+                scene.update_lighting_params(light_height=scene.original_light_pos[1] - 2)
             if '3' in keys:
                 new_roughness = min(0.2, scene.material['roughness'] + 0.01)
                 scene.update_lighting_params(roughness=new_roughness)
@@ -356,12 +414,12 @@ def run_specular_scene():
                 new_shininess = max(10, scene.material['shininess'] - 20)
                 scene.update_lighting_params(shininess=new_shininess)
             if '7' in keys:
-                scene.light_pos[2] -= 5
-                print(f"Light Z position: {scene.light_pos[2]}")
+                scene.original_light_pos[2] -= 5
+                print(f"Light Z position: {scene.original_light_pos[2]}")
                 scene.generate_floor_geometry()
             if '8' in keys:
-                scene.light_pos[2] += 5
-                print(f"Light Z position: {scene.light_pos[2]}")
+                scene.original_light_pos[2] += 5
+                print(f"Light Z position: {scene.original_light_pos[2]}")
                 scene.generate_floor_geometry()
             if 'w' in keys:
                 scene.use_ward = not scene.use_ward
@@ -403,4 +461,4 @@ def run_specular_scene():
 if __name__ == "__main__":
     run_specular_scene()
 
-    #THE BLINN-PHONG ONE IS WORKING I THINK
+    # THE BLINN-PHONG ONE IS WORKING I THINK

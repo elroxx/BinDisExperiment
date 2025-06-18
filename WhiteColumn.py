@@ -112,19 +112,19 @@ class WhiteColumnScene:
         # HYPER PARAEMETERS
         total_height = 15.0
         num_bricks = 500
-        max_offset = 0.3  # random offset from center
-        brick_width = 1.4  # (X dimension)
-        brick_depth = 0.6  # (Z dimension)
+        max_offset = 0.1  # random offset from center
+        brick_width = 1.2  # (X dimension)
+        brick_depth = 0.1  # (Z dimension)
         column_z_position = -20.0  # Distance from camera
 
         # color var
-        min_brightness = 0.1  # darkest (0.0 = black, 1.0 = white)
+        min_brightness = 0  # darkest (0.0 = black, 1.0 = white)
         max_brightness = 1.0  # brightest
         brightness_variation = 1.0  #(0.0 = no variation, 1.0 = full range)
 
         # missing bricks + split row
-        missing_brick_probability = 0.15
-        split_row_probability = 0.25
+        missing_brick_probability = 0.2
+        split_row_probability = 0.3
         split_gap = 0.3  # gap between
 
         # brick height
@@ -153,11 +153,19 @@ class WhiteColumnScene:
                     z_offset = random.uniform(-max_offset, max_offset)
 
                     # random brightness
-                    brightness = random.uniform(
+                    """brightness = random.uniform(
                         max_brightness - brightness_variation,
                         max_brightness
                     )
-                    brightness = max(min_brightness, brightness)
+                    brightness = max(min_brightness, brightness)"""
+                    #POSITION BASED INSTEAD NOW
+                    position_factor = brick_i / (num_bricks - 1)  # 0.0 at top, 1.0 at bottom
+                    base_brightness = max_brightness - (position_factor * (max_brightness - min_brightness))
+
+                    # still a bit of randomness around top tho
+                    variation_amount = 0.1
+                    brightness = base_brightness + random.uniform(-variation_amount, variation_amount)
+                    brightness = max(min_brightness, min(max_brightness, brightness))  # Clipping
 
                     # smaller splits
                     split_brick_width = brick_width * 0.7
