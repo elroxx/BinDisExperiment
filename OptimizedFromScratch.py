@@ -4,7 +4,7 @@ import random
 import numpy as np
 import math
 
-# Try to import numba for acceleration, fallback if not available
+# Test with numba
 try:
     from numba import jit, prange
 
@@ -15,7 +15,7 @@ except ImportError:
     NUMBA_AVAILABLE = False
 
 
-    # Create dummy decorators that do nothing
+    # Needed decorator
     def jit(*args, **kwargs):
         def decorator(func):
             return func
@@ -26,18 +26,17 @@ except ImportError:
     def prange(n):
         return range(n)
 
-# Numba-accelerated functions (defined at module level)
+# numba test
 if NUMBA_AVAILABLE:
     @jit(nopython=True, parallel=True)
     def compute_blinn_phong_numba(vertices, normals, light_pos, camera_pos,
                                   material_ambient, material_diffuse, material_specular,
                                   light_ambient, light_diffuse, light_specular, shininess):
-        """Vectorized Blinn-Phong lighting calculation using Numba JIT"""
         num_vertices = vertices.shape[0]
         colors = np.zeros((num_vertices, 3), dtype=np.float32)
 
         for i in prange(num_vertices):
-            # Vector calculations
+            # vector compute
             light_dir = light_pos - vertices[i]
             light_dist = np.sqrt(np.sum(light_dir * light_dir))
             if light_dist > 1e-8:
@@ -53,7 +52,7 @@ if NUMBA_AVAILABLE:
             if half_dist > 1e-8:
                 half_vector = half_vector / half_dist
 
-            # Lighting components
+            # light components
             ambient = material_ambient * light_ambient
 
             n_dot_l = max(0.0, np.sum(normals[i] * light_dir))
@@ -63,7 +62,7 @@ if NUMBA_AVAILABLE:
             spec_power = n_dot_h ** shininess
             specular = material_specular * light_specular * spec_power
 
-            # Combine and clamp
+            # clamp
             color = ambient + diffuse + specular
             colors[i] = np.clip(color, 0.0, 1.0)
 
@@ -110,7 +109,7 @@ class OptimizedSpecularStreakScene:
         self.light_pos = np.array([0.0, 1.0, -100.0], dtype=np.float32)
         self.camera_pos = np.array([0.0, 1.5, 0.0], dtype=np.float32)
 
-        # Material properties as numpy arrays for vectorization
+        # properties
         self.material = {
             'ambient': np.array([0.05, 0.05, 0.05], dtype=np.float32),
             'diffuse': np.array([0.0, 0.0, 0.0], dtype=np.float32),
@@ -148,31 +147,29 @@ class OptimizedSpecularStreakScene:
         ], dtype=np.float32)
 
     def get_inverse_rotation_matrix(self):
-        # Use cache key for the current angles
+        # cache key to not compute everysingle time
         cache_key = (round(self.angle_x, 2), round(self.angle_z, 2))
 
         if cache_key not in self._rotation_cache:
-            # Create inverse rotations (negative angles)
+            # inverse rot
             rot_z = self.get_rotation_matrix_z(-self.angle_z)
             rot_x = self.get_rotation_matrix_x(-self.angle_x)
-            # Combine in same order as original: rot_z * rot_x
+            # same order
             self._rotation_cache[cache_key] = np.dot(rot_z, rot_x)
 
         return self._rotation_cache[cache_key]
 
     def update_lighting_positions(self):
-        """Update light and camera positions based on current rotation (same as original)"""
-        # Get inverse rotation matrix to transform light and camera positions
         inv_rotation = self.get_inverse_rotation_matrix()
 
-        # Transform light position (apply inverse rotation)
+        # apply inverse rot
         self.light_pos = np.dot(inv_rotation, self.original_light_pos)
 
-        # Transform camera position (apply inverse rotation)
+        # on cam
         self.camera_pos = np.dot(inv_rotation, self.original_camera_pos)
 
     def generate_floor_geometry_static(self):
-        """Generate static geometry (vertices and normals) - called once"""
+        #ONLY CALL STATIC GEO ONCE
         if self._geometry_cache is not None:
             return self._geometry_cache
 
@@ -181,7 +178,7 @@ class OptimizedSpecularStreakScene:
         divisions_x = 25
         divisions_z = 100
 
-        # Pre-allocate arrays for better performance
+        # Pregeo
         num_triangles = divisions_x * divisions_z * 2
         num_vertices = num_triangles * 3
 
@@ -191,12 +188,12 @@ class OptimizedSpecularStreakScene:
         step_x = floor_size_x / divisions_x
         step_z = floor_size_z / divisions_z
 
-        # Pre-generate random normal variations
-        np.random.seed(42)  # For reproducible results
-        normal_variations = np.random.normal(0, [0, 0.0, 0], (num_vertices, 3))
-        normal_variations[:, 1] = 1.0  # Keep Y component as 1
+        # pre gen
+        np.random.seed(42)
+        normal_variations = np.random.normal(0, [0.1, 0.0, 0.1], (num_vertices, 3))
+        normal_variations[:, 1] = 1.0  # need y as 1
 
-        # Normalize all normals at once
+        # normalize all at once
         norms = np.linalg.norm(normal_variations, axis=1, keepdims=True)
         normals = normal_variations / norms
 
@@ -228,7 +225,6 @@ class OptimizedSpecularStreakScene:
         return vertices, normals
 
     def compute_lighting_vectorized(self, vertices, normals):
-        """Compute lighting for all vertices using vectorized operations"""
         if self.use_ward:
             print("Using Ward BRDF lighting...")
             return self.compute_ward_lighting_fallback(vertices, normals)
@@ -248,14 +244,14 @@ class OptimizedSpecularStreakScene:
                 except Exception as e:
                     print(f"Numba calculation failed: {e}, falling back to NumPy")
 
-            # Fallback to pure NumPy implementation
+            # pure numpy
             return self.compute_blinn_phong_numpy(vertices, normals)
 
     def compute_blinn_phong_numpy(self, vertices, normals):
-        """Pure NumPy Blinn-Phong implementation (fallback)"""
+        #numpy only
         print("Using pure NumPy Blinn-Phong implementation...")
 
-        # Vectorized calculations using pure NumPy
+        # vecto in numpy
         light_dirs = self.light_pos[np.newaxis, :] - vertices  # (N, 3)
         light_dists = np.linalg.norm(light_dirs, axis=1, keepdims=True)  # (N, 1)
         light_dirs = light_dirs / np.maximum(light_dists, 1e-8)  # Normalize
@@ -268,7 +264,7 @@ class OptimizedSpecularStreakScene:
         half_dists = np.linalg.norm(half_vectors, axis=1, keepdims=True)  # (N, 1)
         half_vectors = half_vectors / np.maximum(half_dists, 1e-8)  # Normalize
 
-        # Lighting components
+        # light compo
         ambient = self.material['ambient'] * self.light['ambient']  # (3,)
         ambient = np.tile(ambient, (len(vertices), 1))  # (N, 3)
 
@@ -279,7 +275,7 @@ class OptimizedSpecularStreakScene:
         spec_power = np.power(n_dot_h, self.material['shininess'])  # (N, 1)
         specular = self.material['specular'] * self.light['specular'] * spec_power  # (N, 3)
 
-        # Combine and clamp
+        # camp
         colors = ambient + diffuse + specular
         colors = np.clip(colors, 0.0, 1.0)
 
@@ -287,7 +283,7 @@ class OptimizedSpecularStreakScene:
         return colors.astype(np.float32)
 
     def compute_ward_lighting_fallback(self, vertices, normals):
-        """Fallback Ward lighting (can be optimized with Numba if needed)"""
+        #still base ward
         colors = np.zeros((len(vertices), 3), dtype=np.float32)
 
         for i, (vertex, normal) in enumerate(zip(vertices, normals)):
@@ -300,7 +296,7 @@ class OptimizedSpecularStreakScene:
         return colors
 
     def ward_lighting_single(self, vertex_pos, normal, view_pos, light_pos):
-        """Single vertex Ward lighting calculation"""
+        #ward
         pos = np.array(vertex_pos, dtype=np.float32)
         n = np.array(normal, dtype=np.float32)
 
@@ -347,17 +343,15 @@ class OptimizedSpecularStreakScene:
         return np.clip(color, 0.0, 1.0)
 
     def generate_floor_geometry(self):
-        """Generate complete floor geometry with lighting"""
-        # Always update lighting positions first
         self.update_lighting_positions()
 
-        # Get or generate static geometry
+        # gen static geo
         vertices, normals = self.generate_floor_geometry_static()
 
-        # Compute lighting for all vertices
+        # light all vert
         colors = self.compute_lighting_vectorized(vertices, normals)
 
-        # Store for rendering - ensure proper formatting for OpenGL
+        # STORE
         self.floor_vertices = np.ascontiguousarray(vertices, dtype=np.float32)
         self.floor_normals = np.ascontiguousarray(normals, dtype=np.float32)
         self.floor_colors = np.ascontiguousarray(colors, dtype=np.float32)
@@ -378,7 +372,7 @@ class OptimizedSpecularStreakScene:
         gluLookAt(0.0, 1.5, 0.0, 0.0, 1.0, -10.0, 0.0, 1.0, 0.0)
 
     def render_glossy_floor(self):
-        """Optimized rendering with fallback options"""
+        #optimized witbh fallback
         if self.rendering_method == "vertex_arrays" and self.use_vertex_arrays:
             try:
                 self.render_vertex_arrays()
@@ -392,13 +386,12 @@ class OptimizedSpecularStreakScene:
             self.render_immediate_mode()
 
     def render_vertex_arrays(self):
-        """Vertex array rendering method"""
-        # Ensure arrays are contiguous and in the right format for OpenGL
+        #vertex array
         vertices_gl = np.ascontiguousarray(self.floor_vertices, dtype=np.float32)
         normals_gl = np.ascontiguousarray(self.floor_normals, dtype=np.float32)
         colors_gl = np.ascontiguousarray(self.floor_colors, dtype=np.float32)
 
-        # Validate array shapes
+        # sometimes the shape were weird so debug
         if len(vertices_gl.shape) != 2 or vertices_gl.shape[1] != 3:
             raise ValueError(f"Invalid vertex array shape: {vertices_gl.shape}")
         if len(normals_gl.shape) != 2 or normals_gl.shape[1] != 3:
@@ -410,7 +403,7 @@ class OptimizedSpecularStreakScene:
         glEnableClientState(GL_NORMAL_ARRAY)
         glEnableClientState(GL_COLOR_ARRAY)
 
-        # Use ctypes interface for OpenGL compatibility
+        # ctypes
         glVertexPointer(3, GL_FLOAT, 0, vertices_gl.ctypes.data)
         glNormalPointer(GL_FLOAT, 0, normals_gl.ctypes.data)
         glColorPointer(3, GL_FLOAT, 0, colors_gl.ctypes.data)
@@ -422,7 +415,7 @@ class OptimizedSpecularStreakScene:
         glDisableClientState(GL_COLOR_ARRAY)
 
     def render_immediate_mode(self):
-        """Fallback immediate mode rendering (slower but compatible)"""
+        #FALLBACK NORMAL
         glBegin(GL_TRIANGLES)
         for i in range(len(self.floor_vertices)):
             color = self.floor_colors[i]
@@ -436,7 +429,6 @@ class OptimizedSpecularStreakScene:
         glEnd()
 
     def update_lighting_params(self, light_height=None, roughness=None, shininess=None):
-        """Update lighting parameters and regenerate only lighting"""
         if light_height is not None:
             self.original_light_pos[1] = light_height
         if roughness is not None:
@@ -449,11 +441,9 @@ class OptimizedSpecularStreakScene:
               f"Z={self.original_light_pos[2]:.1f}, roughness={self.material['roughness']:.3f}, "
               f"shininess={self.material['shininess']:.1f}")
 
-        # Only regenerate lighting, not geometry
         self.generate_floor_geometry()
 
     def update_angles(self, delta_x=0, delta_z=0):
-        """Update rotation angles and regenerate lighting"""
         old_angle_x = self.angle_x
         old_angle_z = self.angle_z
 
@@ -463,27 +453,25 @@ class OptimizedSpecularStreakScene:
         if self.angle_x != old_angle_x or self.angle_z != old_angle_z:
             print(f"Rotation updated - X: {self.angle_x}, Z: {self.angle_z}")
 
-            # Clear rotation cache for this angle combination if it exists
             cache_key = (round(self.angle_x, 2), round(self.angle_z, 2))
             if cache_key in self._rotation_cache:
                 del self._rotation_cache[cache_key]
 
-            # Update lighting positions and regenerate geometry
+            # update light pos
             self.update_lighting_positions()
             print(f"Light position after rotation: {self.light_pos}")
             print(f"Camera position after rotation: {self.camera_pos}")
 
-            # Regenerate only the lighting (not the static geometry)
+            # regen only lightning
             vertices, normals = self.generate_floor_geometry_static()
             colors = self.compute_lighting_vectorized(vertices, normals)
 
-            # Store for rendering
+            # Store
             self.floor_vertices = np.ascontiguousarray(vertices, dtype=np.float32)
             self.floor_normals = np.ascontiguousarray(normals, dtype=np.float32)
             self.floor_colors = np.ascontiguousarray(colors, dtype=np.float32)
 
     def render_frame(self):
-        """Optimized frame rendering"""
         try:
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             glEnable(GL_DEPTH_TEST)
@@ -505,7 +493,6 @@ class OptimizedSpecularStreakScene:
 
 
 def run_optimized_specular_scene():
-    """Main function to run the optimized specular scene"""
     win = None
     try:
         win = visual.Window(
@@ -552,9 +539,8 @@ def run_optimized_specular_scene():
                 print("Exiting...")
                 break
 
-            # Handle input with better responsiveness
             if keys:
-                # View controls
+                # controls
                 if 'left' in keys:
                     scene.update_angles(delta_z=-10)
                 if 'right' in keys:
@@ -564,7 +550,7 @@ def run_optimized_specular_scene():
                 if 'down' in keys:
                     scene.update_angles(delta_x=1)
 
-                # Lighting parameter controls
+                # Lighting controls
                 if '1' in keys:
                     scene.update_lighting_params(light_height=scene.original_light_pos[1] + 2)
                 if '2' in keys:
@@ -625,8 +611,8 @@ def run_optimized_specular_scene():
                 traceback.print_exc()
                 break
 
-            # More precise frame rate limiting
-            core.wait(0.001)  # Minimal wait for responsiveness
+            # rate limiting
+            core.wait(0.001)  # slight wait
 
     except Exception as e:
         print(f"Error creating window or scene: {e}")

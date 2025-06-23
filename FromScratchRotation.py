@@ -188,9 +188,9 @@ class SpecularStreakScene:
         self.update_lighting_positions()
 
         # floor params
-        floor_size_z = 40.0
-        floor_size_x = 40.0
-        divisions_x = 100
+        floor_size_z = 20.0
+        floor_size_x = 10.0
+        divisions_x = 25
         divisions_z = 100
         step_x = floor_size_x / divisions_x
         step_z = floor_size_z / divisions_z
@@ -211,7 +211,7 @@ class SpecularStreakScene:
             for j in range(divisions_z):
                 x1 = -floor_size_x / 2 + i * step_x
                 x2 = x1 + step_x
-                z1 = -floor_size_z / 2 + j * step_z
+                z1 = -floor_size_z + j * step_z
                 z2 = z1 + step_z
 
                 # Triangle 1
@@ -274,7 +274,7 @@ class SpecularStreakScene:
                   0.0, 1.0, 0.0)  # Up vector
 
     def render_glossy_floor(self):
-        # Render using vertex colors computed with our custom lighting
+        # Render using vertex colors computed with custom lighting
         glBegin(GL_TRIANGLES)
         for i in range(len(self.floor_vertices)):
             # Set color for this vertex
@@ -305,7 +305,6 @@ class SpecularStreakScene:
         self.generate_floor_geometry()
 
     def update_angles(self, delta_x=0, delta_z=0):
-        """Update rotation angles and regenerate geometry if needed"""
         old_angle_x = self.angle_x
         old_angle_z = self.angle_z
 
