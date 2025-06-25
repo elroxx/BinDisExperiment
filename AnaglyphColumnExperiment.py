@@ -177,7 +177,7 @@ class AnaglyphColumnExperiment:
             self.create_default_conditions()
 
     def create_default_conditions(self):
-        """default exp if no working"""
+
         disparities = [-0.8, -0.4, -0.2, -0.1, 0.0, 0.1, 0.2, 0.4, 0.8]  # In degrees
         distances = [-15, -20, -25]  # Column distances
 
@@ -426,7 +426,7 @@ Press ESC to quit at any time.""",
 
             # Present stimulus
             start_time = core.getTime()
-            stimulus_duration = trial_data.get('presentation_time', 2.0)
+            stimulus_duration = trial_data.get('presentation_time', 7.0)
 
             while core.getTime() - start_time < stimulus_duration:
                 self.render_anaglyph_frame(trial_data)
