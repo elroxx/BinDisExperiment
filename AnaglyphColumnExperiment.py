@@ -320,16 +320,16 @@ class AnaglyphColumnExperiment:
             glBegin(GL_TRIANGLES)
             for i in range(len(brick['vertices'])):
                 x, y, z = brick['vertices'][i]
-                # position computed along vector
+                # position along vector
                 x_world = x + column_position[0]
                 y_world = y + column_position[1]
                 z_world = z + column_position[2]
 
-                # Calculate proper disparity for this specific vertex
+                # disparity for 1 vertex
                 vertex_disparity_pixels = self.calculate_disparity_for_point(x_world, y_world, z_world,
                                                                              base_disparity_degrees)
 
-                # Apply eye-specific disparity offset
+                # eye specific disparity
                 if eye == 'left':
                     disparity_x = -vertex_disparity_pixels / 2 * 0.01  # Convert to world units
                 else:
