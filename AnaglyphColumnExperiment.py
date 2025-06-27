@@ -7,11 +7,12 @@ import os
 from datetime import datetime
 import pandas as pd
 
+# WITH THIS SCALING!
+# DONT PLACE ANYTHING BETWEEN 6.485 and 15.297 (sqrt234) ALONG VECTOR. distance along vector at 15 is below the plane, and at 6 its above the plane.
+good_distances_to_test = [3, 25]
+#good_disparities = [-0.6, -0.3, -0.1, 0.0, 0.1, 0.3, 0.6]
+good_disparities = [0.3]
 
-#WITH THIS SCALING!
-#DONT PLACE ANYTHING BETWEEN 6.485 and 15.297 (sqrt234) ALONG VECTOR. distance along vector at 15 is below the plane, and at 6 its above the plane.
-good_distances_to_test = [3, 6, 16, 22, 26]
-good_disparities = [-0.6, -0.3, -0.1, 0.0, 0.1, 0.3, 0.6]
 
 class AnaglyphColumnExperiment:
     def __init__(self, win):
@@ -39,8 +40,9 @@ class AnaglyphColumnExperiment:
         self.experiment_data = []
 
         # Anaglyph params
-        self.eye_separation = 0.065  # human ipd meters
-        self.screen_distance = 0.6  # distance to screen meters
+        self.eye_separation = 0.1 #0.065  # human ipd meters
+        self.screen_distance = 0.2  # distance to screen meters
+        self.convergence_distance = 15.0  # Distance where disparity = 0 so verging on the plane
 
     def calculate_viewing_vector(self):
         vx = self.look_at_point[0] - self.camera_pos[0]
@@ -57,9 +59,28 @@ class AnaglyphColumnExperiment:
         z = self.camera_pos[2] + distance * self.viewing_vector[2]
         return [x, y, z]
 
+    def calculate_disparity_for_point(self, world_x, world_y, world_z, base_disparity_degrees):
+        """Calculate proper disparity for a 3D point based on its distance from camera"""
+        # Calculate actual distance from camera to this point
+        dx = world_x - self.camera_pos[0]
+        dy = world_y - self.camera_pos[1]
+        dz = world_z - self.camera_pos[2]
+        actual_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+        # Calculate disparity based on actual distance relative to convergence distance
+        # Closer objects have positive disparity, farther objects have negative disparity
+        distance_factor = (self.convergence_distance - actual_distance) / self.convergence_distance
+
+        # Apply base disparity plus distance-based disparity
+        total_disparity_degrees = base_disparity_degrees + distance_factor * 0.5  # 0.5 degrees max distance effect
+
+        # Convert to pixel disparity
+        disparity_pixels = total_disparity_degrees * (self.win.size[0] / 60.0)
+        return disparity_pixels
+
     def setup_opengl(self):
         glEnable(GL_DEPTH_TEST)
-        glDisable(GL_LIGHTING)  #no lighting
+        glDisable(GL_LIGHTING)  # no lighting
         glDisable(GL_LIGHT0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -98,7 +119,7 @@ class AnaglyphColumnExperiment:
                 self.floor_normals.extend(triangle2_normals)
 
     def generate_all_column_geometries(self):
-        #pre gen geoemetries
+        # pre gen geoemetries
         distances = good_distances_to_test  # Along viewing vector
 
         for distance in distances:
@@ -129,7 +150,7 @@ class AnaglyphColumnExperiment:
         brick_height = total_height / num_bricks
         missing_brick_probability = 0.1
 
-        #uniform brightness
+        # uniform brightness
         uniform_brightness = 0.8
 
         pos = column_data['position']
@@ -243,13 +264,13 @@ class AnaglyphColumnExperiment:
 
         random.shuffle(self.trials)
 
-        #save to csv
+        # save to csv
         df = pd.DataFrame(self.trials)
         df.to_csv('experiment_conditions.csv', index=False)
         print("Created default experiment_conditions.csv")
 
-    def setup_anaglyph_camera(self, eye='left', disparity_pixels=0):
-        #cam
+    def setup_anaglyph_camera(self, eye='left', disparity_offset_x=0):
+        # cam
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         aspect_ratio = self.win.size[0] / self.win.size[1]
@@ -264,21 +285,19 @@ class AnaglyphColumnExperiment:
         else:
             eye_offset = self.eye_separation / 2
 
-        # offset for disparity
-        disparity_offset = disparity_pixels * 0.01  # units
-
         # cam above and slight downward angle
         gluLookAt(
-            self.camera_pos[0] + eye_offset + disparity_offset,
+            self.camera_pos[0] + eye_offset + disparity_offset_x,
             self.camera_pos[1],
             self.camera_pos[2],  # Eye position
-            self.look_at_point[0] + disparity_offset,
+            self.look_at_point[0] + disparity_offset_x,
             self.look_at_point[1],
             self.look_at_point[2],  # Look at point
             0.0, 1.0, 0.0  # Up vector
         )
 
-    def render_column(self, distance_along_vector, color_filter=(1.0, 1.0, 1.0)):
+    def render_column_with_proper_disparity(self, distance_along_vector, base_disparity_degrees, eye='left',
+                                            color_filter=(1.0, 1.0, 1.0)):
         if distance_along_vector not in self.column_geometries:
             print(f"Warning: No geometry found for distance {distance_along_vector}")
             return
@@ -305,7 +324,18 @@ class AnaglyphColumnExperiment:
                 x_world = x + column_position[0]
                 y_world = y + column_position[1]
                 z_world = z + column_position[2]
-                glVertex3f(x_world, y_world, z_world)
+
+                # Calculate proper disparity for this specific vertex
+                vertex_disparity_pixels = self.calculate_disparity_for_point(x_world, y_world, z_world,
+                                                                             base_disparity_degrees)
+
+                # Apply eye-specific disparity offset
+                if eye == 'left':
+                    disparity_x = -vertex_disparity_pixels / 2 * 0.01  # Convert to world units
+                else:
+                    disparity_x = vertex_disparity_pixels / 2 * 0.01
+
+                glVertex3f(x_world + disparity_x, y_world, z_world)
             glEnd()
 
     def render_floor(self, color_filter=(1.0, 1.0, 1.0)):
@@ -324,8 +354,6 @@ class AnaglyphColumnExperiment:
         disparity = trial_data['disparity_degrees']
         distance_along_vector = trial_data['distance_along_vector']
 
-        disparity_pixels = disparity * (self.win.size[0] / 60.0)
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
 
@@ -333,10 +361,10 @@ class AnaglyphColumnExperiment:
         glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)  # Only red channel
         glClear(GL_DEPTH_BUFFER_BIT)
 
-        self.setup_anaglyph_camera('left', -disparity_pixels / 2)
+        self.setup_anaglyph_camera('left', 0)
 
         glDisable(GL_BLEND)
-        self.render_column(distance_along_vector, color_filter=(1.0, 0.0, 0.0))
+        self.render_column_with_proper_disparity(distance_along_vector, disparity, 'left', color_filter=(1.0, 0.0, 0.0))
 
         glEnable(GL_BLEND)
         self.render_floor(color_filter=(1.0, 0.0, 0.0))
@@ -345,10 +373,11 @@ class AnaglyphColumnExperiment:
         glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)  # Green and blue channels
         glClear(GL_DEPTH_BUFFER_BIT)
 
-        self.setup_anaglyph_camera('right', disparity_pixels / 2)
+        self.setup_anaglyph_camera('right', 0)
 
         glDisable(GL_BLEND)
-        self.render_column(distance_along_vector, color_filter=(0.0, 1.0, 1.0))
+        self.render_column_with_proper_disparity(distance_along_vector, disparity, 'right',
+                                                 color_filter=(0.0, 1.0, 1.0))
 
         glEnable(GL_BLEND)
         self.render_floor(color_filter=(0.0, 1.0, 1.0))
@@ -361,12 +390,13 @@ class AnaglyphColumnExperiment:
         instruction_text = visual.TextStim(
             self.win,
             text="""ANAGLYPH DEPTH PERCEPTION EXPERIMENT
-(Above/Below Ground Plane)
+(Above/Below Ground Plane - Enhanced Disparity)
 
 Put on the red-cyan 3D glasses now.
 
 You will see a white column positioned at different locations.
 The camera is looking down at a slight angle.
+Each part of the column now has proper stereoscopic disparity!
 
 Your task is to judge whether the column appears:
 
@@ -534,7 +564,7 @@ def run_anaglyph_experiment():
         )
         win.recordFrameIntervals = False
 
-        print("Initializing anaglyph experiment with downward-angled camera...")
+        print("Initializing anaglyph experiment with proper per-vertex disparity...")
         experiment = AnaglyphColumnExperiment(win)
         experiment.run_experiment()
 
