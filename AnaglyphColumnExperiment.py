@@ -10,7 +10,7 @@ import pandas as pd
 # WITH THIS SCALING!
 # DONT PLACE ANYTHING BETWEEN 6.485 and 15.297 (sqrt234) ALONG VECTOR. distance along vector at 15 is below the plane, and at 6 its above the plane.
 good_distances_to_test = [3, 25]
-#good_disparities = [-0.6, -0.3, -0.1, 0.0, 0.1, 0.3, 0.6]
+# good_disparities = [-0.6, -0.3, -0.1, 0.0, 0.1, 0.3, 0.6]
 good_disparities = [0.3]
 
 
@@ -18,7 +18,6 @@ class AnaglyphColumnExperiment:
     def __init__(self, win):
         self.win = win
         self.setup_opengl()
-        self.generate_floor_geometry()
 
         # cam params
         self.camera_pos = [0, 3.0, 0]
@@ -28,6 +27,12 @@ class AnaglyphColumnExperiment:
         # Reference distance for scaling calculations
         self.reference_distance = 15.0  # Reference distance along viewing vector
         self.reference_visual_angle_degrees = 1.5
+
+        # Calculate checkerboard square size based on column dimensions
+        self.checkerboard_square_size = self.calculate_required_square_size()
+
+        # Generate checkerboard floor and column geometries
+        self.generate_checkerboard_floor()
 
         # pre gen the columns
         self.column_geometries = {}
@@ -40,7 +45,7 @@ class AnaglyphColumnExperiment:
         self.experiment_data = []
 
         # Anaglyph params
-        self.eye_separation = 0.1 #0.065  # human ipd meters
+        self.eye_separation = 0.1  # 0.065  # human ipd meters
         self.screen_distance = 0.2  # distance to screen meters
         self.convergence_distance = 15.0  # Distance where disparity = 0 so verging on the plane
 
@@ -59,22 +64,140 @@ class AnaglyphColumnExperiment:
         z = self.camera_pos[2] + distance * self.viewing_vector[2]
         return [x, y, z]
 
+    def calculate_required_square_size(self):
+        """Calculate the minimum square size needed to ensure column is always FULLY CENTERED in a transparent square"""
+        max_column_width = 0
+
+        # Check all possible distances to find maximum column width
+        for distance in good_distances_to_test:
+            size_factor = distance / self.reference_distance
+            column_width = 0.8 * size_factor  # base_brick_width * size_factor
+            column_depth = 0.08 * size_factor  # base_brick_depth * size_factor
+
+            # Account for random offsets (these are applied to each brick)
+            max_offset = 0.04 * size_factor
+            total_width = column_width + 2 * max_offset
+            total_depth = column_depth + 2 * max_offset
+
+            max_dimension = max(total_width, total_depth)
+            max_column_width = max(max_column_width, max_dimension)
+
+            print(f"Distance {distance}: width={total_width:.3f}, depth={total_depth:.3f}")
+
+        # CRITICAL: Column must be CENTERED in square with enough margin that it NEVER touches edges
+        # This ensures NO occlusion cues that would reveal depth information
+        required_size = max_column_width * 3.0  # 200% safety margin for full centering
+        nice_size = math.ceil(required_size * 2) / 2  # Round to nearest 0.5
+
+        print(f"Maximum column dimension: {max_column_width:.3f}")
+        print(f"Required square size (with centering): {nice_size:.3f}")
+
+        return nice_size
+
+    def generate_checkerboard_floor(self):
+        """Generate a checkerboard pattern floor ensuring column is CENTERED in transparent squares"""
+        floor_size = 60.0  # Larger floor for better coverage
+        square_size = self.checkerboard_square_size
+
+        # Calculate number of squares in each direction
+        num_squares = int(floor_size / square_size) + 4  # Extra coverage
+
+        self.floor_white_vertices = []
+        self.floor_white_normals = []
+
+        # CRITICAL: Design pattern so column positions are CENTERED in transparent squares
+        # Column is always at x=0, z varies based on distance along viewing vector
+
+        print(f"Generating checkerboard: {num_squares}x{num_squares} squares of size {square_size}")
+        print("Ensuring column is CENTERED in transparent squares at all distances...")
+        print("Removing ALL white squares aligned with column in z-direction...")
+
+        # Calculate column positions for verification
+        column_positions = []
+        for distance in good_distances_to_test:
+            pos = self.calculate_position_along_vector(distance)
+            column_positions.append((pos[0], pos[2]))  # x, z coordinates
+            print(f"Column at distance {distance}: x={pos[0]:.2f}, z={pos[2]:.2f}")
+
+        # Start from a reference point that ensures proper centering
+        reference_x = 0.0
+        reference_z = column_positions[0][1]  # Use first column z-position as reference
+
+        # Align grid so reference point is at CENTER of a square
+        start_x = reference_x - (num_squares * square_size) / 2
+        start_z = reference_z - (num_squares * square_size) / 2
+
+        # Adjust start positions to align grid centers with column positions
+        grid_offset_x = (reference_x - start_x) % square_size - square_size / 2
+        grid_offset_z = (reference_z - start_z) % square_size - square_size / 2
+        start_x += grid_offset_x
+        start_z += grid_offset_z
+
+        # Determine which x-column contains the viewing column (x=0)
+        column_x_grid_index = round((0.0 - reference_x) / square_size)
+
+        for i in range(num_squares):
+            for j in range(num_squares):
+                x1 = start_x + i * square_size
+                x2 = x1 + square_size
+                z1 = start_z + j * square_size
+                z2 = z1 + square_size
+
+                square_center_x = (x1 + x2) / 2
+                square_center_z = (z1 + z2) / 2
+
+                # Determine grid position
+                grid_i = round((square_center_x - reference_x) / square_size)
+                grid_j = round((square_center_z - reference_z) / square_size)
+
+                # CRITICAL: Remove ALL white squares in the column's x-aligned row
+                # This creates a transparent corridor along the entire z-direction where the column moves
+                is_in_column_corridor = (grid_i == column_x_grid_index)
+
+                if is_in_column_corridor:
+                    # Force this entire row to be transparent (no white squares)
+                    print(f"Removing white square in column corridor at ({square_center_x:.1f}, {square_center_z:.1f})")
+                    continue  # Skip adding this square, making it transparent
+
+                # For squares NOT in the column corridor, use normal checkerboard pattern
+                is_white = (grid_i + grid_j) % 2 == 1  # need center transparent
+
+                # Only add white squares to the vertex list
+                if is_white:
+                    # Add two triangles for this square
+                    triangle1_vertices = [(x1, 0.0, z1), (x2, 0.0, z1), (x1, 0.0, z2)]
+                    triangle1_normals = [(0, 1, 0)] * 3
+
+                    triangle2_vertices = [(x2, 0.0, z1), (x2, 0.0, z2), (x1, 0.0, z2)]
+                    triangle2_normals = [(0, 1, 0)] * 3
+
+                    self.floor_white_vertices.extend(triangle1_vertices)
+                    self.floor_white_vertices.extend(triangle2_vertices)
+                    self.floor_white_normals.extend(triangle1_normals)
+                    self.floor_white_normals.extend(triangle2_normals)
+                else:
+                    # This is a transparent square - cif column position we remove it woo
+                    for dist, (col_x, col_z) in zip(good_distances_to_test, column_positions):
+                        if (abs(square_center_x - col_x) < square_size / 4 and
+                                abs(square_center_z - col_z) < square_size / 4):
+                            print(
+                                f"✓ Column at distance {dist} CENTERED in transparent square at ({square_center_x:.1f}, {square_center_z:.1f})")
+                            print(f"  Square boundaries: x=[{x1:.1f}, {x2:.1f}], z=[{z1:.1f}, {z2:.1f}]")
+                            print(f"  Column clearance: x=±{square_size / 2:.1f}, z=±{square_size / 2:.1f}")
+
+        print(f"Total white squares generated: {len(self.floor_white_vertices) // 6}")  # 6 vertices per square
+
     def calculate_disparity_for_point(self, world_x, world_y, world_z, base_disparity_degrees):
-        """Calculate proper disparity for a 3D point based on its distance from camera"""
-        # Calculate actual distance from camera to this point
+        #disparity for plane
         dx = world_x - self.camera_pos[0]
         dy = world_y - self.camera_pos[1]
         dz = world_z - self.camera_pos[2]
         actual_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
 
-        # Calculate disparity based on actual distance relative to convergence distance
-        # Closer objects have positive disparity, farther objects have negative disparity
         distance_factor = (self.convergence_distance - actual_distance) / self.convergence_distance
 
-        # Apply base disparity plus distance-based disparity
         total_disparity_degrees = base_disparity_degrees + distance_factor * 0.5  # 0.5 degrees max distance effect
 
-        # Convert to pixel disparity
         disparity_pixels = total_disparity_degrees * (self.win.size[0] / 60.0)
         return disparity_pixels
 
@@ -91,32 +214,6 @@ class AnaglyphColumnExperiment:
         # size factor/distance so always about same size
         size_factor = distance / self.reference_distance
         return size_factor
-
-    def generate_floor_geometry(self):
-        floor_size = 40.0
-        divisions = 50
-        step = floor_size / divisions
-
-        self.floor_vertices = []
-        self.floor_normals = []
-
-        for i in range(divisions):
-            for j in range(divisions):
-                x1 = -floor_size / 2 + i * step
-                x2 = x1 + step
-                z1 = -floor_size / 2 + j * step
-                z2 = z1 + step
-
-                triangle1_vertices = [(x1, 0.0, z1), (x2, 0.0, z1), (x1, 0.0, z2)]
-                triangle1_normals = [(0, 1, 0)] * 3
-
-                triangle2_vertices = [(x2, 0.0, z1), (x2, 0.0, z2), (x1, 0.0, z2)]
-                triangle2_normals = [(0, 1, 0)] * 3
-
-                self.floor_vertices.extend(triangle1_vertices)
-                self.floor_vertices.extend(triangle2_vertices)
-                self.floor_normals.extend(triangle1_normals)
-                self.floor_normals.extend(triangle2_normals)
 
     def generate_all_column_geometries(self):
         # pre gen geoemetries
@@ -338,16 +435,28 @@ class AnaglyphColumnExperiment:
                 glVertex3f(x_world + disparity_x, y_world, z_world)
             glEnd()
 
-    def render_floor(self, color_filter=(1.0, 1.0, 1.0)):
+    def render_checkerboard_floor_with_disparity(self, base_disparity_degrees, eye='left',
+                                                 color_filter=(1.0, 1.0, 1.0)):
+        """Render only the white squares of the checkerboard with proper anaglyph disparity"""
         r, g, b = color_filter
 
-        # darker floor than column
-        glColor4f(0.3 * r, 0.3 * g, 0.3 * b, 0.3)
+        # White squares are brighter than the old solid floor
+        glColor4f(0.9 * r, 0.9 * g, 0.9 * b, 1.0)
 
         glBegin(GL_TRIANGLES)
-        for i in range(len(self.floor_vertices)):
-            x, y, z = self.floor_vertices[i]
-            glVertex3f(x, y, z)
+        for i in range(len(self.floor_white_vertices)):
+            x, y, z = self.floor_white_vertices[i]
+
+            # Calculate disparity for each floor vertex
+            vertex_disparity_pixels = self.calculate_disparity_for_point(x, y, z, base_disparity_degrees)
+
+            # Apply eye-specific disparity
+            if eye == 'left':
+                disparity_x = -vertex_disparity_pixels / 2 * 0.01
+            else:
+                disparity_x = vertex_disparity_pixels / 2 * 0.01
+
+            glVertex3f(x + disparity_x, y, z)
         glEnd()
 
     def render_anaglyph_frame(self, trial_data):
@@ -357,7 +466,7 @@ class AnaglyphColumnExperiment:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
 
-        # render left eye
+        # render left eye (red channel)
         glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)  # Only red channel
         glClear(GL_DEPTH_BUFFER_BIT)
 
@@ -367,9 +476,9 @@ class AnaglyphColumnExperiment:
         self.render_column_with_proper_disparity(distance_along_vector, disparity, 'left', color_filter=(1.0, 0.0, 0.0))
 
         glEnable(GL_BLEND)
-        self.render_floor(color_filter=(1.0, 0.0, 0.0))
+        self.render_checkerboard_floor_with_disparity(disparity, 'left', color_filter=(1.0, 0.0, 0.0))
 
-        # render cyan
+        # render right eye (cyan channel)
         glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)  # Green and blue channels
         glClear(GL_DEPTH_BUFFER_BIT)
 
@@ -380,7 +489,7 @@ class AnaglyphColumnExperiment:
                                                  color_filter=(0.0, 1.0, 1.0))
 
         glEnable(GL_BLEND)
-        self.render_floor(color_filter=(0.0, 1.0, 1.0))
+        self.render_checkerboard_floor_with_disparity(disparity, 'right', color_filter=(0.0, 1.0, 1.0))
 
         # reset color mask
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
@@ -390,18 +499,21 @@ class AnaglyphColumnExperiment:
         instruction_text = visual.TextStim(
             self.win,
             text="""ANAGLYPH DEPTH PERCEPTION EXPERIMENT
-(Above/Below Ground Plane - Enhanced Disparity)
+(Above/Below Checkerboard Plane)
 
 Put on the red-cyan 3D glasses now.
 
 You will see a white column positioned at different locations.
-The camera is looking down at a slight angle.
-Each part of the column now has proper stereoscopic disparity!
+The ground is a checkerboard pattern with white and transparent squares.
+
+IMPORTANT: The column is always CENTERED within a transparent square
+and never touches the white squares. This ensures you judge depth 
+purely from stereoscopic cues, not occlusion!
 
 Your task is to judge whether the column appears:
 
-ABOVE the ground plane/floor (press 'A')
-BELOW the ground plane/floor (press 'B')
+ABOVE the checkerboard plane (press 'A')
+BELOW the checkerboard plane (press 'B')
 
 The column size adjusts for distance to maintain constant visual angle.
 Take your time and be as accurate as possible.
@@ -409,7 +521,7 @@ The column will disappear after a few seconds.
 
 Press SPACE to begin the experiment.
 Press ESC to quit at any time.""",
-            height=30,
+            height=28,
             wrapWidth=800,
             color='white',
             pos=(0, 0)
@@ -436,7 +548,7 @@ Press ESC to quit at any time.""",
         # get response
         response_text = visual.TextStim(
             self.win,
-            text="Column appears:\n\n(A) Above the ground plane\n(B) Below the ground plane",
+            text="Column appears:\n\n(A) Above the checkerboard plane\n(B) Below the checkerboard plane",
             height=30,
             color='white',
             pos=(0, 0)
@@ -564,7 +676,7 @@ def run_anaglyph_experiment():
         )
         win.recordFrameIntervals = False
 
-        print("Initializing anaglyph experiment with proper per-vertex disparity...")
+        print("Initializing anaglyph experiment with checkerboard pattern...")
         experiment = AnaglyphColumnExperiment(win)
         experiment.run_experiment()
 
