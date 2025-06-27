@@ -8,46 +8,68 @@ from datetime import datetime
 import pandas as pd
 
 
+#WITH THIS SCALING!
+#DONT PLACE ANYTHING BETWEEN 6.485 and 15.297 (sqrt234) ALONG VECTOR. distance along vector at 15 is below the plane, and at 6 its above the plane.
+good_distances_to_test = [3, 6, 16, 22, 26]
+good_disparities = [-0.6, -0.3, -0.1, 0.0, 0.1, 0.3, 0.6]
+
 class AnaglyphColumnExperiment:
     def __init__(self, win):
         self.win = win
         self.setup_opengl()
-        self.setup_lighting()
         self.generate_floor_geometry()
-        self.generate_column_geometry()
 
-        # Experiment parameters
+        # cam params
+        self.camera_pos = [0, 3.0, 0]
+        self.look_at_point = [0, 0, -15]  # down/forward
+        self.viewing_vector = self.calculate_viewing_vector()
+
+        # Reference distance for scaling calculations
+        self.reference_distance = 15.0  # Reference distance along viewing vector
+        self.reference_visual_angle_degrees = 1.5
+
+        # pre gen the columns
+        self.column_geometries = {}
+        self.generate_all_column_geometries()
+
+        # exp parmas
         self.trials = []
         self.current_trial = 0
         self.responses = []
         self.experiment_data = []
 
-        # Anaglyph param
-        self.eye_separation = 0.065  # Average human IPD in meters
-        self.screen_distance = 0.6  # Distance to screen in meters
+        # Anaglyph params
+        self.eye_separation = 0.065  # human ipd meters
+        self.screen_distance = 0.6  # distance to screen meters
+
+    def calculate_viewing_vector(self):
+        vx = self.look_at_point[0] - self.camera_pos[0]
+        vy = self.look_at_point[1] - self.camera_pos[1]
+        vz = self.look_at_point[2] - self.camera_pos[2]
+
+        # Normalize vector
+        length = math.sqrt(vx * vx + vy * vy + vz * vz)
+        return [vx / length, vy / length, vz / length]
+
+    def calculate_position_along_vector(self, distance):
+        x = self.camera_pos[0] + distance * self.viewing_vector[0]
+        y = self.camera_pos[1] + distance * self.viewing_vector[1]
+        z = self.camera_pos[2] + distance * self.viewing_vector[2]
+        return [x, y, z]
 
     def setup_opengl(self):
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
-        glEnable(GL_COLOR_MATERIAL)
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+        glDisable(GL_LIGHTING)  #no lighting
+        glDisable(GL_LIGHT0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glShadeModel(GL_SMOOTH)
+        glShadeModel(GL_FLAT)  # flat shading
         glClearColor(0.0, 0.0, 0.0, 1.0)
 
-    def setup_lighting(self):
-        # Main light
-        light0_pos = (GLfloat * 4)(0.0, 8.0, -5.0, 1.0)
-        light0_ambient = (GLfloat * 4)(0.3, 0.3, 0.3, 1.0)
-        light0_diffuse = (GLfloat * 4)(0.8, 0.8, 0.8, 1.0)
-        light0_specular = (GLfloat * 4)(1.0, 1.0, 1.0, 1.0)
-
-        glLightfv(GL_LIGHT0, GL_POSITION, light0_pos)
-        glLightfv(GL_LIGHT0, GL_AMBIENT, light0_ambient)
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse)
-        glLightfv(GL_LIGHT0, GL_SPECULAR, light0_specular)
+    def calculate_size_for_distance(self, distance):
+        # size factor/distance so always about same size
+        size_factor = distance / self.reference_distance
+        return size_factor
 
     def generate_floor_geometry(self):
         floor_size = 40.0
@@ -75,18 +97,46 @@ class AnaglyphColumnExperiment:
                 self.floor_normals.extend(triangle1_normals)
                 self.floor_normals.extend(triangle2_normals)
 
-    def generate_column_geometry(self):
-        self.column_vertices = []
-        self.column_normals = []
-        self.brick_data = []
+    def generate_all_column_geometries(self):
+        #pre gen geoemetries
+        distances = good_distances_to_test  # Along viewing vector
 
-        total_height = 15.0
-        num_bricks = 300
-        max_offset = 0.08
-        brick_width = 1.0
-        brick_depth = 0.08
+        for distance in distances:
+            self.column_geometries[distance] = self.generate_column_geometry_for_distance(distance)
+
+    def generate_column_geometry_for_distance(self, distance_along_vector):
+        column_data = {}
+        column_data['vertices'] = []
+        column_data['normals'] = []
+        column_data['brick_data'] = []
+        column_data['position'] = self.calculate_position_along_vector(distance_along_vector)
+
+        # scaling factor on distance
+        size_factor = self.calculate_size_for_distance(distance_along_vector)
+
+        # base distance
+        base_total_height = 4.0  # Much shorter column
+        base_brick_width = 0.8
+        base_brick_depth = 0.08
+
+        # Scale
+        total_height = base_total_height * size_factor
+        brick_width = base_brick_width * size_factor
+        brick_depth = base_brick_depth * size_factor
+
+        num_bricks = 80  # less bricks
+        max_offset = 0.04 * size_factor  # scale offset as well
         brick_height = total_height / num_bricks
-        missing_brick_probability = 0.15
+        missing_brick_probability = 0.1
+
+        #uniform brightness
+        uniform_brightness = 0.8
+
+        pos = column_data['position']
+        print(f"Generating column for distance {distance_along_vector}: "
+              f"position=({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}), "
+              f"size_factor={size_factor:.3f}, height={total_height:.3f}")
+        print(f"  Plane relationship: {'ABOVE' if pos[1] > 0 else 'BELOW'} ground plane")
 
         for brick_i in range(num_bricks):
             y_top = -brick_i * brick_height
@@ -98,14 +148,12 @@ class AnaglyphColumnExperiment:
             x_offset = random.uniform(-max_offset, max_offset)
             z_offset = random.uniform(-max_offset, max_offset)
 
-            # Position-based brightness for better depth cues
-            position_factor = brick_i / (num_bricks - 1)
-            base_brightness = 1.0 - (position_factor * 0.3)
-            brightness = base_brightness + random.uniform(-0.1, 0.1)
-            brightness = max(0.4, min(1.0, brightness))
+            # small random variation like my prev column
+            brightness = uniform_brightness + random.uniform(-0.1, 0.1)
+            brightness = max(0.6, min(1.0, brightness))
 
             brick_x = x_offset
-            brick_z = z_offset  # modified each trial
+            brick_z = z_offset
 
             x1 = brick_x - brick_width / 2
             x2 = brick_x + brick_width / 2
@@ -116,12 +164,14 @@ class AnaglyphColumnExperiment:
             brick_normals = []
             self.add_brick_faces(x1, x2, y_top, y_bottom, z1, z2, brick_vertices, brick_normals)
 
-            self.brick_data.append({
+            column_data['brick_data'].append({
                 'vertices': brick_vertices,
                 'normals': brick_normals,
                 'brightness': brightness,
                 'base_z': brick_z
             })
+
+        return column_data
 
     def add_brick_faces(self, x1, x2, y_top, y_bottom, z1, z2, vertices, normals):
         # Front face
@@ -170,37 +220,36 @@ class AnaglyphColumnExperiment:
         try:
             df = pd.read_csv(csv_filename)
             self.trials = df.to_dict('records')
-            random.shuffle(self.trials)  # Randomize trial order
+            random.shuffle(self.trials)  # randomize  order
             print(f"Loaded {len(self.trials)} trials from {csv_filename}")
         except FileNotFoundError:
             print(f"CSV file {csv_filename} not found. Creating default conditions...")
             self.create_default_conditions()
 
     def create_default_conditions(self):
-
-        disparities = [-0.8, -0.4, -0.2, -0.1, 0.0, 0.1, 0.2, 0.4, 0.8]  # In degrees
-        distances = [-15, -20, -25]  # Column distances
+        disparities = good_disparities  # degress
+        distances = good_distances_to_test  # Distances along viewing vector
 
         self.trials = []
         for disparity in disparities:
             for distance in distances:
-                for repeat in range(3):  # 3 repetitions per condition
+                for repeat in range(2):  # 2 repetitions per condition
                     self.trials.append({
                         'disparity_degrees': disparity,
-                        'column_distance': distance,
+                        'distance_along_vector': distance,
                         'trial_id': len(self.trials) + 1,
-                        'presentation_time': 2.0
+                        'presentation_time': 3.0
                     })
 
         random.shuffle(self.trials)
 
-        # default to csv
+        #save to csv
         df = pd.DataFrame(self.trials)
         df.to_csv('experiment_conditions.csv', index=False)
         print("Created default experiment_conditions.csv")
 
     def setup_anaglyph_camera(self, eye='left', disparity_pixels=0):
-        #setup cam
+        #cam
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         aspect_ratio = self.win.size[0] / self.win.size[1]
@@ -209,127 +258,122 @@ class AnaglyphColumnExperiment:
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
 
-        # Calculate eye offset for stereoscopic effect
+        # eye offset for stereo anag
         if eye == 'left':
             eye_offset = -self.eye_separation / 2
         else:
             eye_offset = self.eye_separation / 2
 
-        # horizontal offset
-        disparity_offset = disparity_pixels * 0.01  #world units
+        # offset for disparity
+        disparity_offset = disparity_pixels * 0.01  # units
 
-        gluLookAt(eye_offset + disparity_offset, 1.5, 0.0,  # eye
-                  disparity_offset, 1.0, -10.0,  # Look at point
-                  0.0, 1.0, 0.0)  # Up vector
+        # cam above and slight downward angle
+        gluLookAt(
+            self.camera_pos[0] + eye_offset + disparity_offset,
+            self.camera_pos[1],
+            self.camera_pos[2],  # Eye position
+            self.look_at_point[0] + disparity_offset,
+            self.look_at_point[1],
+            self.look_at_point[2],  # Look at point
+            0.0, 1.0, 0.0  # Up vector
+        )
 
-    def render_column(self, column_distance, color_filter=(1.0, 1.0, 1.0)):
-        for brick in self.brick_data:
+    def render_column(self, distance_along_vector, color_filter=(1.0, 1.0, 1.0)):
+        if distance_along_vector not in self.column_geometries:
+            print(f"Warning: No geometry found for distance {distance_along_vector}")
+            return
+
+        column_data = self.column_geometries[distance_along_vector]
+        column_position = column_data['position']
+
+        for brick in column_data['brick_data']:
             brightness = brick['brightness']
 
-            # color filter for analgyoh
+            # no lighting
             r, g, b = color_filter
             color_r = brightness * r
             color_g = brightness * g
             color_b = brightness * b
 
-            mat_ambient = (GLfloat * 4)(0.3 * color_r, 0.3 * color_g, 0.3 * color_b, 1.0)
-            mat_diffuse = (GLfloat * 4)(color_r, color_g, color_b, 1.0)
-            mat_specular = (GLfloat * 4)(color_r, color_g, color_b, 1.0)
-            mat_shininess = (GLfloat * 1)(32.0)
-
-            glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, mat_ambient)
-            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, mat_diffuse)
-            glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, mat_specular)
-            glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, mat_shininess)
-
+            # color directly
             glColor4f(color_r, color_g, color_b, 1.0)
 
             glBegin(GL_TRIANGLES)
             for i in range(len(brick['vertices'])):
-                nx, ny, nz = brick['normals'][i]
                 x, y, z = brick['vertices'][i]
-                # Adjust Z position based on column distance
-                z_adjusted = z + column_distance
-                glNormal3f(nx, ny, nz)
-                glVertex3f(x, y, z_adjusted)
+                # position computed along vector
+                x_world = x + column_position[0]
+                y_world = y + column_position[1]
+                z_world = z + column_position[2]
+                glVertex3f(x_world, y_world, z_world)
             glEnd()
 
     def render_floor(self, color_filter=(1.0, 1.0, 1.0)):
         r, g, b = color_filter
-        mat_ambient = (GLfloat * 4)(0.1 * r, 0.1 * g, 0.1 * b, 0.3)
-        mat_diffuse = (GLfloat * 4)(0.2 * r, 0.2 * g, 0.2 * b, 0.3)
 
-        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, mat_ambient)
-        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, mat_diffuse)
-
+        # darker floor than column
         glColor4f(0.3 * r, 0.3 * g, 0.3 * b, 0.3)
 
         glBegin(GL_TRIANGLES)
         for i in range(len(self.floor_vertices)):
-            nx, ny, nz = self.floor_normals[i]
             x, y, z = self.floor_vertices[i]
-            glNormal3f(nx, ny, nz)
             glVertex3f(x, y, z)
         glEnd()
 
     def render_anaglyph_frame(self, trial_data):
         disparity = trial_data['disparity_degrees']
-        column_distance = trial_data['column_distance']
+        distance_along_vector = trial_data['distance_along_vector']
 
         disparity_pixels = disparity * (self.win.size[0] / 60.0)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
-        glEnable(GL_COLOR_MATERIAL)
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-        glShadeModel(GL_SMOOTH)
 
-        self.setup_lighting()
-
-        # Render left eye (red channel)
+        # render left eye
         glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)  # Only red channel
         glClear(GL_DEPTH_BUFFER_BIT)
 
         self.setup_anaglyph_camera('left', -disparity_pixels / 2)
 
         glDisable(GL_BLEND)
-        self.render_column(column_distance, color_filter=(1.0, 0.0, 0.0))
+        self.render_column(distance_along_vector, color_filter=(1.0, 0.0, 0.0))
 
         glEnable(GL_BLEND)
         self.render_floor(color_filter=(1.0, 0.0, 0.0))
 
-        # Render right eye (cyan channel)
+        # render cyan
         glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)  # Green and blue channels
         glClear(GL_DEPTH_BUFFER_BIT)
 
         self.setup_anaglyph_camera('right', disparity_pixels / 2)
 
         glDisable(GL_BLEND)
-        self.render_column(column_distance, color_filter=(0.0, 1.0, 1.0))
+        self.render_column(distance_along_vector, color_filter=(0.0, 1.0, 1.0))
 
         glEnable(GL_BLEND)
         self.render_floor(color_filter=(0.0, 1.0, 1.0))
 
-        # Reset color mask
+        # reset color mask
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     def show_instructions(self):
-    #instructions
+        # Instructions
         instruction_text = visual.TextStim(
             self.win,
             text="""ANAGLYPH DEPTH PERCEPTION EXPERIMENT
+(Above/Below Ground Plane)
 
 Put on the red-cyan 3D glasses now.
 
-You will see a white column that appears at different depths.
+You will see a white column positioned at different locations.
+The camera is looking down at a slight angle.
+
 Your task is to judge whether the column appears:
 
-CLOSER than the floor (press 'C')
-FARTHER than the floor (press 'F') 
-AT THE SAME DEPTH as the floor (press 'S')
+ABOVE the ground plane/floor (press 'A')
+BELOW the ground plane/floor (press 'B')
 
+The column size adjusts for distance to maintain constant visual angle.
 Take your time and be as accurate as possible.
 The column will disappear after a few seconds.
 
@@ -359,10 +403,10 @@ Press ESC to quit at any time.""",
         event.waitKeys(keyList=['space'])
 
     def collect_response(self, trial_data, start_time):
-        #get reponse
+        # get response
         response_text = visual.TextStim(
             self.win,
-            text="Column appears:\n\n(C) Closer than floor\n(F) Farther than floor\n(S) Same depth as floor",
+            text="Column appears:\n\n(A) Above the ground plane\n(B) Below the ground plane",
             height=30,
             color='white',
             pos=(0, 0)
@@ -371,7 +415,7 @@ Press ESC to quit at any time.""",
         response_text.draw()
         self.win.flip()
 
-        keys = event.waitKeys(keyList=['c', 'f', 's', 'escape'])
+        keys = event.waitKeys(keyList=['a', 'b', 'escape'])
         response_time = core.getTime() - start_time
 
         if 'escape' in keys:
@@ -379,12 +423,20 @@ Press ESC to quit at any time.""",
 
         response = keys[0].upper()
 
+        # get correct answer
+        column_position = self.column_geometries[trial_data['distance_along_vector']]['position']
+        correct_answer = 'A' if column_position[1] > 0 else 'B'
+        is_correct = response == correct_answer
+
         # record data
         trial_record = {
             'trial_id': trial_data['trial_id'],
             'disparity_degrees': trial_data['disparity_degrees'],
-            'column_distance': trial_data['column_distance'],
+            'distance_along_vector': trial_data['distance_along_vector'],
+            'column_y_position': column_position[1],
             'response': response,
+            'correct_answer': correct_answer,
+            'is_correct': is_correct,
             'response_time': response_time,
             'timestamp': datetime.now().isoformat()
         }
@@ -393,23 +445,29 @@ Press ESC to quit at any time.""",
         return response
 
     def save_results(self, participant_id):
-        #save csv
+        # Save csv
         if not self.experiment_data:
             return
 
         filename = f"anaglyph_results_{participant_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df = pd.DataFrame(self.experiment_data)
         df.to_csv(filename, index=False)
+
+        # get accuracy
+        correct_responses = sum(1 for trial in self.experiment_data if trial['is_correct'])
+        total_responses = len(self.experiment_data)
+        accuracy = correct_responses / total_responses if total_responses > 0 else 0
+
         print(f"Results saved to {filename}")
+        print(f"Accuracy: {correct_responses}/{total_responses} ({accuracy:.1%})")
 
     def run_experiment(self):
-        #run full experiemnt
-        # Get participant ID
+        # full exp
+        # get id
         dlg = gui.Dlg(title="Participant Information")
         dlg.addField('Participant ID:')
         dlg.addField('Age:')
         dlg.addField('Gender:')
-        dlg.addField('Vision Correction:', choices=['None', 'Glasses', 'Contacts'])
 
         participant_info = dlg.show()
         if dlg.OK == False:
@@ -424,9 +482,9 @@ Press ESC to quit at any time.""",
             if trial_num > 1:
                 self.show_trial_feedback(trial_num, len(self.trials))
 
-            # Present stimulus
+            # show image
             start_time = core.getTime()
-            stimulus_duration = trial_data.get('presentation_time', 7.0)
+            stimulus_duration = trial_data.get('presentation_time', 3.0)
 
             while core.getTime() - start_time < stimulus_duration:
                 self.render_anaglyph_frame(trial_data)
@@ -438,15 +496,15 @@ Press ESC to quit at any time.""",
                     self.save_results(participant_id)
                     return
 
-            # Collect response
+            # Collect
             response = self.collect_response(trial_data, start_time)
             if response is None:  # Escape pressed
                 break
 
-        # Save results
+        # save
         self.save_results(participant_id)
 
-        # Show completion message
+        # end msg
         completion_text = visual.TextStim(
             self.win,
             text="Experiment complete!\n\nThank you for participating.\n\nPress any key to exit.",
@@ -461,7 +519,7 @@ Press ESC to quit at any time.""",
 
 
 def run_anaglyph_experiment():
-    #aanglyph experiemnt
+    # Run anaglyph experiment
     win = None
     try:
         win = visual.Window(
@@ -476,7 +534,7 @@ def run_anaglyph_experiment():
         )
         win.recordFrameIntervals = False
 
-        print("Initializing anaglyph experiment...")
+        print("Initializing anaglyph experiment with downward-angled camera...")
         experiment = AnaglyphColumnExperiment(win)
         experiment.run_experiment()
 
