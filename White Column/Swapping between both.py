@@ -83,7 +83,6 @@ class SimpleColumnRenderer:
         return [eye_x, eye_y, eye_z]
 
     def generate_filter_planes(self):
-        """Generate filter planes in front of each eye for anaglyph effect"""
         # position filter planes further from eyes to cover field of view properly
         filter_distance = 0.1  # further from eye so it acts as proper filter
         filter_size = 0.2  # large enough to cover significant field of view
@@ -107,7 +106,6 @@ class SimpleColumnRenderer:
         self.right_filter_vertices = self.create_filter_quad(right_filter_pos, filter_size)
 
     def create_filter_quad(self, center_pos, size):
-        """Create a larger quad for color filter positioned properly relative to viewing direction"""
         # get right and up vectors relative to viewing direction
         up_vector = [0, 1, 0]
         vx, vy, vz = self.viewing_vector
@@ -158,7 +156,6 @@ class SimpleColumnRenderer:
         return vertices
 
     def render_filter_plane(self, vertices, color):
-        """Render a color filter plane with proper blending for anaglyph effect"""
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
