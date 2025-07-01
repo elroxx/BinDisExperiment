@@ -55,7 +55,6 @@ class SimpleColumnRenderer:
         self.experiment_data = []
 
     def calculate_eye_position(self, eye):
-        """Calculate left or right eye position"""
         # get right vector (perpendicular to viewing vector)
         up_vector = [0, 1, 0]
         vx, vy, vz = self.viewing_vector
