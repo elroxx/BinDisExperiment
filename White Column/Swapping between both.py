@@ -18,7 +18,7 @@ class SimpleColumnRenderer:
 
         # cam params
         self.camera_pos = [0, 3.0, 0]
-        self.look_at_point = [0, 0, -15]  # down/forward
+        self.look_at_point = [0, 3.0, -15]  # down/forward
         self.viewing_vector = self.calculate_viewing_vector()
 
         # anaglyph params
@@ -83,9 +83,21 @@ class SimpleColumnRenderer:
         return [eye_x, eye_y, eye_z]
 
     def generate_filter_planes(self):
-        # position filter planes further from eyes to cover field of view properly
-        filter_distance = 0.1  # further from eye so it acts as proper filter
-        filter_size = 0.2  # large enough to cover significant field of view
+        # position filter planes close enough to eye but far enough to cover full FOV
+        filter_distance = 0.5  # distance from eye to filter plane
+
+        # calculate filter size needed to cover full field of view
+        # using 45 degree FOV (from gluPerspective call) and aspect ratio
+        aspect_ratio = self.win.size[0] / self.win.size[1]
+        fov_radians = math.radians(45.0)
+
+        # calculate size needed to cover full vertical FOV at filter distance
+        filter_height = 2.0 * filter_distance * math.tan(fov_radians / 2.0)
+        filter_width = filter_height * aspect_ratio
+
+        # add extra margin to ensure full coverage
+        filter_height *= 1.5  # 50% extra coverage
+        filter_width *= 1.5
 
         # left eye filter (red) - positioned in front of left eye
         left_filter_pos = [
@@ -101,11 +113,11 @@ class SimpleColumnRenderer:
             self.right_eye_pos[2] + filter_distance * self.viewing_vector[2]
         ]
 
-        # create filter plane vertices (larger squares to cover more field of view)
-        self.left_filter_vertices = self.create_filter_quad(left_filter_pos, filter_size)
-        self.right_filter_vertices = self.create_filter_quad(right_filter_pos, filter_size)
+        # create filter plane vertices (sized to cover full FOV)
+        self.left_filter_vertices = self.create_filter_quad(left_filter_pos, filter_width, filter_height)
+        self.right_filter_vertices = self.create_filter_quad(right_filter_pos, filter_width, filter_height)
 
-    def create_filter_quad(self, center_pos, size):
+    def create_filter_quad(self, center_pos, width, height):
         # get right and up vectors relative to viewing direction
         up_vector = [0, 1, 0]
         vx, vy, vz = self.viewing_vector
@@ -126,31 +138,32 @@ class SimpleColumnRenderer:
         up_y = right_z * vx - right_x * vz
         up_z = right_x * vy - right_y * vx
 
-        half_size = size / 2.0
+        half_width = width / 2.0
+        half_height = height / 2.0
         cx, cy, cz = center_pos
 
         # create quad vertices using both right and up vectors for proper orientation
         vertices = [
             # triangle 1
-            (cx - half_size * right_x - half_size * up_x,
-             cy - half_size * right_y - half_size * up_y,
-             cz - half_size * right_z - half_size * up_z),
-            (cx + half_size * right_x - half_size * up_x,
-             cy + half_size * right_y - half_size * up_y,
-             cz + half_size * right_z - half_size * up_z),
-            (cx - half_size * right_x + half_size * up_x,
-             cy - half_size * right_y + half_size * up_y,
-             cz - half_size * right_z + half_size * up_z),
+            (cx - half_width * right_x - half_height * up_x,
+             cy - half_width * right_y - half_height * up_y,
+             cz - half_width * right_z - half_height * up_z),
+            (cx + half_width * right_x - half_height * up_x,
+             cy + half_width * right_y - half_height * up_y,
+             cz + half_width * right_z - half_height * up_z),
+            (cx - half_width * right_x + half_height * up_x,
+             cy - half_width * right_y + half_height * up_y,
+             cz - half_width * right_z + half_height * up_z),
             # triangle 2
-            (cx + half_size * right_x - half_size * up_x,
-             cy + half_size * right_y - half_size * up_y,
-             cz + half_size * right_z - half_size * up_z),
-            (cx + half_size * right_x + half_size * up_x,
-             cy + half_size * right_y + half_size * up_y,
-             cz + half_size * right_z + half_size * up_z),
-            (cx - half_size * right_x + half_size * up_x,
-             cy - half_size * right_y + half_size * up_y,
-             cz - half_size * right_z + half_size * up_z)
+            (cx + half_width * right_x - half_height * up_x,
+             cy + half_width * right_y - half_height * up_y,
+             cz + half_width * right_z - half_height * up_z),
+            (cx + half_width * right_x + half_height * up_x,
+             cy + half_width * right_y + half_height * up_y,
+             cz + half_width * right_z + half_height * up_z),
+            (cx - half_width * right_x + half_height * up_x,
+             cy - half_width * right_y + half_height * up_y,
+             cz - half_width * right_z + half_height * up_z)
         ]
 
         return vertices
@@ -162,8 +175,8 @@ class SimpleColumnRenderer:
         # disable depth testing for filter to ensure it renders on top
         glDisable(GL_DEPTH_TEST)
 
-        # set filter color with higher opacity for better anaglyph effect
-        glColor4f(color[0], color[1], color[2], 0.85)  # more opaque for stronger filter effect
+        # set filter color with transparency for anaglyph effect
+        glColor4f(color[0], color[1], color[2], 0.4)  # semi-transparent for proper anaglyph
 
         glBegin(GL_TRIANGLES)
         for vertex in vertices:
@@ -175,9 +188,12 @@ class SimpleColumnRenderer:
         glDisable(GL_BLEND)
 
     def calculate_viewing_vector(self):
-        vx = self.look_at_point[0] - self.camera_pos[0]
-        vy = self.look_at_point[1] - self.camera_pos[1]
-        vz = self.look_at_point[2] - self.camera_pos[2]
+        #vx = self.look_at_point[0] - self.camera_pos[0]
+        #vy = self.look_at_point[1] - self.camera_pos[1]
+        #vz = self.look_at_point[2] - self.camera_pos[2]
+        vx=0
+        vy=-3
+        vz=-15
 
         # Normalize vector
         length = math.sqrt(vx * vx + vy * vy + vz * vz)
@@ -412,7 +428,7 @@ class SimpleColumnRenderer:
         # cam from eye position with downward angle
         gluLookAt(
             eye_position[0], eye_position[1], eye_position[2],  # Eye position
-            self.look_at_point[0], self.look_at_point[1], self.look_at_point[2],  # Look at point
+            self.look_at_point[0]+eye_position[0], self.look_at_point[1], self.look_at_point[2],  # Look at point
             0.0, 1.0, 0.0  # Up vector
         )
 

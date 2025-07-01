@@ -18,7 +18,7 @@ class SimpleColumnRenderer:
 
         # cam params
         self.camera_pos = [0, 3.0, 0]
-        self.look_at_point = [0, 0, -15]  # down/forward
+        self.look_at_point = [0, 3.0, -15]  # down/forward
         self.viewing_vector = self.calculate_viewing_vector()
 
         # for scale calc
@@ -42,9 +42,12 @@ class SimpleColumnRenderer:
         self.experiment_data = []
 
     def calculate_viewing_vector(self):
-        vx = self.look_at_point[0] - self.camera_pos[0]
-        vy = self.look_at_point[1] - self.camera_pos[1]
-        vz = self.look_at_point[2] - self.camera_pos[2]
+        #vx = self.look_at_point[0] - self.camera_pos[0]
+        #vy = self.look_at_point[1] - self.camera_pos[1]
+        #vz = self.look_at_point[2] - self.camera_pos[2]
+        vx=0
+        vy=-3
+        vz=-15
 
         # Normalize vector
         length = math.sqrt(vx * vx + vy * vy + vz * vz)
