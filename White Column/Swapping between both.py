@@ -19,13 +19,13 @@ class SimpleColumnRenderer:
         # cam params
         self.camera_pos = [0, 3.0, 0]
         self.look_at_point = [0, 3.0, -15]  # down/forward
-        self.viewing_vector = self.calculate_viewing_vector()
+        self.viewing_vector = self.calculate_viewing_vector() #its still my previous vector because it was used for  creating my column
 
         # anaglyph params
-        self.eye_separation = 0.065  # 6.5cm typical interpupillary distance
-        self.current_eye = 'left'  # start with left eye
+        self.eye_separation = 0.065  #eye separation. it works well so not changing it i think
+        self.current_eye = 'left'
         self.frame_counter = 0
-        self.eye_swap_rate = 1  # swap every N frames (1 = every frame for fastest)
+        self.eye_swap_rate = 1  #1frame is my quickest already, I would need to find a way to up my fps ???
 
         # eye positions
         self.left_eye_pos = self.calculate_eye_position('left')
@@ -55,11 +55,12 @@ class SimpleColumnRenderer:
         self.experiment_data = []
 
     def calculate_eye_position(self, eye):
-        # get right vector (perpendicular to viewing vector)
+
+        #i shouldve just used the camera pos +- the good pos, which is techically what i end up doing
+
         up_vector = [0, 1, 0]
         vx, vy, vz = self.viewing_vector
 
-        # cross product of viewing vector and up vector gives right vector
         right_x = vy * up_vector[2] - vz * up_vector[1]
         right_y = vz * up_vector[0] - vx * up_vector[2]
         right_z = vx * up_vector[1] - vy * up_vector[0]
@@ -85,17 +86,16 @@ class SimpleColumnRenderer:
         # position filter planes close enough to eye but far enough to cover full FOV
         filter_distance = 0.5  # distance from eye to filter plane
 
-        # calculate filter size needed to cover full field of view
-        # using 45 degree FOV (from gluPerspective call) and aspect ratio
+        # get from gov
         aspect_ratio = self.win.size[0] / self.win.size[1]
         fov_radians = math.radians(45.0)
 
-        # calculate size needed to cover full vertical FOV at filter distance
+        # size for FOV
         filter_height = 2.0 * filter_distance * math.tan(fov_radians / 2.0)
         filter_width = filter_height * aspect_ratio
 
-        # add extra margin to ensure full coverage
-        filter_height *= 1.5  # 50% extra coverage
+        # my filter didnt cover anything
+        filter_height *= 1.5
         filter_width *= 1.5
 
         # left eye filter (red) - positioned in front of left eye
@@ -175,7 +175,7 @@ class SimpleColumnRenderer:
         glDisable(GL_DEPTH_TEST)
 
         # set filter color with transparency for anaglyph effect
-        glColor4f(color[0], color[1], color[2], 0.4)  # semi-transparent for proper anaglyph
+        glColor4f(color[0], color[1], color[2], 0.4)  # anaglyph
 
         glBegin(GL_TRIANGLES)
         for vertex in vertices:
@@ -778,7 +778,7 @@ def run_depth_perception_study():
 
         # choose mode
         mode_dlg = gui.Dlg(title="Select Mode")
-        mode_dlg.addField('Mode:', choices=['Demo', 'Experiment'])
+        mode_dlg.addField('Mode:', choices=['Demo', 'Experiment']) # demo doesnt work somehow it spawns two columns
         mode_info = mode_dlg.show()
 
         if mode_dlg.OK == False:
