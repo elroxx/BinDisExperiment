@@ -7,8 +7,8 @@ import os
 from datetime import datetime
 import pandas as pd
 
-good_distances_to_test = [3, 25]
-good_disparities = [5] #multiplier now
+good_distances_to_test = [5]
+good_disparities = [5] #multiplier now #useless right now
 
 
 class SimpleColumnRenderer:
@@ -361,7 +361,7 @@ class SimpleColumnRenderer:
         column_position = column_data['position']
 
         # white color
-        glColor4f(0.33, 0.33, 0.33, 1.0) #trying gray so that it gives a darker red.
+        glColor4f(0.66, 0.66, 0.66, 1.0) #trying gray so that it gives a darker red.
 
         for brick in column_data['brick_data']:
             glBegin(GL_TRIANGLES)
