@@ -43,8 +43,8 @@ class SimpleColumnRenderer:
 
         # Anaglyph 3D parameters
         self.anaglyph_enabled = False
-        self.eye_separation_base = 0.3  # ipd (originally 0.065 but almost no result)
-        self.viewing_distance = 0.5  # distance to screen
+        self.eye_separation_base = 0.065  # ipd (originally 0.065 but almost no result)
+        self.viewing_distance = 0.3  # distance to screen
 
     def calculate_viewing_vector(self):
         # vx = self.look_at_point[0] - self.camera_pos[0]
@@ -71,52 +71,57 @@ class SimpleColumnRenderer:
         # Convert disparity to radians
         disparity_radians = math.radians(disparity_degrees)
 
-        # Calculate separation based on viewing distance and desired disparity
-        # For small angles: separation = disparity * viewing_distance
         separation = disparity_radians * self.viewing_distance
 
         # capped sepearation
         max_separation = self.eye_separation_base * 2
         return min(separation, max_separation)
 
-    def get_stereo_camera_positions(self, disparity_degrees):
-        eye_separation = self.calculate_eye_separation(disparity_degrees)
+    def get_stereo_camera_positions(self):
+        eye_separation = self.eye_separation_base
 
-        # Calculate right vector (perpendicular to viewing direction)
-        # Since viewing vector is mostly in -z direction, right vector is mostly in +x
         up_vector = [0, 1, 0]
         viewing_vec = self.viewing_vector
 
-        # Cross product to get right vector
+        # Right = cross(viewing, up)
         right_x = viewing_vec[1] * up_vector[2] - viewing_vec[2] * up_vector[1]
         right_y = viewing_vec[2] * up_vector[0] - viewing_vec[0] * up_vector[2]
         right_z = viewing_vec[0] * up_vector[1] - viewing_vec[1] * up_vector[0]
 
-        # Normalize right vector
-        right_length = math.sqrt(right_x ** 2 + right_y ** 2 + right_z ** 2)
-        if right_length > 0:
-            right_x /= right_length
-            right_y /= right_length
-            right_z /= right_length
-        else:
-            right_x, right_y, right_z = 1, 0, 0  # Default to x-axis
+        length = math.sqrt(right_x ** 2 + right_y ** 2 + right_z ** 2)
+        right_x /= length
+        right_y /= length
+        right_z /= length
 
-        # Calculate left and right eye positions
-        half_separation = eye_separation / 2
+        half_sep = eye_separation / 2.0
 
-        left_eye_pos = [
-            self.camera_pos[0] - half_separation * right_x,
-            self.camera_pos[1] - half_separation * right_y,
-            self.camera_pos[2] - half_separation * right_z
+        left_eye = [
+            self.camera_pos[0] - half_sep * right_x,
+            self.camera_pos[1] - half_sep * right_y,
+            self.camera_pos[2] - half_sep * right_z
         ]
-
-        right_eye_pos = [
-            self.camera_pos[0] + half_separation * right_x,
-            self.camera_pos[1] + half_separation * right_y,
-            self.camera_pos[2] + half_separation * right_z
+        right_eye = [
+            self.camera_pos[0] + half_sep * right_x,
+            self.camera_pos[1] + half_sep * right_y,
+            self.camera_pos[2] + half_sep * right_z
         ]
+        return left_eye, right_eye
 
-        return left_eye_pos, right_eye_pos
+    def render_crosshair(self):
+        glLineWidth(2.0)
+        glColor3f(1.0, 1.0, 1.0)
+
+        # Crosshair at far depth
+        depth = -100.0
+        size = 0.1
+        y = 3.0  # Eye level
+
+        glBegin(GL_LINES)
+        glVertex3f(-size, y, depth)
+        glVertex3f(size, y, depth)
+        glVertex3f(0.0, y - size, depth)
+        glVertex3f(0.0, y + size, depth)
+        glEnd()
 
     def calculate_required_square_size(self):
         max_column_width = 0
@@ -338,7 +343,6 @@ class SimpleColumnRenderer:
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
 
-        # Use provided eye position or default camera position
         if eye_position is None:
             eye_position = self.camera_pos
 
@@ -357,7 +361,7 @@ class SimpleColumnRenderer:
         column_position = column_data['position']
 
         # white color
-        glColor4f(1.0, 1.0, 1.0, 1.0)
+        glColor4f(0.33, 0.33, 0.33, 1.0) #trying gray so that it gives a darker red.
 
         for brick in column_data['brick_data']:
             glBegin(GL_TRIANGLES)
@@ -409,34 +413,33 @@ class SimpleColumnRenderer:
             # Stereo anaglyph rendering
             self.render_anaglyph_frame(disparity_degrees)
 
-    def render_anaglyph_frame(self, disparity_degrees):
-        left_eye_pos, right_eye_pos = self.get_stereo_camera_positions(disparity_degrees)
+    def render_anaglyph_frame(self, disparity_degrees=None):
+        """Render the scene using anaglyph stereo with fixed eye separation (vergence at infinity)"""
+        left_eye_pos, right_eye_pos = self.get_stereo_camera_positions()
 
-        # clear frame first
+        # Clear color and depth
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
 
-        # RED CHANNEL ONLY (left eye)
-        glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)  # ONLY RED CHANNEL
-        glClear(GL_DEPTH_BUFFER_BIT)  # clear depth buffer for left eye
+        # LEFT EYE — RED channel
+        glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
+        glClear(GL_DEPTH_BUFFER_BIT)
         self.setup_camera(left_eye_pos)
-
-        # all geometry for left eye
         for distance in good_distances_to_test:
             self.render_column(distance)
         self.render_checkerboard_floor()
+        self.render_crosshair()
 
-        # CYAN CHANNEL ONLY
-        glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)  #ONLY CYAN (so green+blue)
-        glClear(GL_DEPTH_BUFFER_BIT)  # clear depth buffer for right eye
+        # RIGHT EYE — GREEN + BLUE (cyan)
+        glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)
+        glClear(GL_DEPTH_BUFFER_BIT)
         self.setup_camera(right_eye_pos)
-
-        # all geometry for right eye
         for distance in good_distances_to_test:
             self.render_column(distance)
         self.render_checkerboard_floor()
+        self.render_crosshair()
 
-        # put back full color mask
+        # Restore full color output
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     def render_trial_frame(self, trial_data):
@@ -454,7 +457,7 @@ class SimpleColumnRenderer:
             self.render_scene_geometry(distance_along_vector)
         else:
             # anaglyph
-            left_eye_pos, right_eye_pos = self.get_stereo_camera_positions(disparity_degrees)
+            left_eye_pos, right_eye_pos = self.get_stereo_camera_positions()
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             glEnable(GL_DEPTH_TEST)
