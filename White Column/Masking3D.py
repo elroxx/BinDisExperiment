@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 
 good_distances_to_test = [3, 25]
-good_disparities = [0.1]
+good_disparities = [5] #multiplier now
 
 
 class SimpleColumnRenderer:
@@ -19,17 +19,7 @@ class SimpleColumnRenderer:
         # cam params
         self.camera_pos = [0, 3.0, 0]
         self.look_at_point = [0, 3.0, -15]  # down/forward
-        self.viewing_vector = self.calculate_viewing_vector() #its still my previous vector because it was used for  creating my column
-
-        # anaglyph params
-        self.eye_separation = 0.1  #eye separation. it works well so not changing it i think
-        self.current_eye = 'left'
-        self.frame_counter = 0
-        self.eye_swap_rate = 10  #1frame is my quickest already, I would need to find a way to up my fps ???
-
-        # eye positions
-        self.left_eye_pos = self.calculate_eye_position('left')
-        self.right_eye_pos = self.calculate_eye_position('right')
+        self.viewing_vector = self.calculate_viewing_vector()
 
         # for scale calc
         self.reference_distance = 15.0  # along viewing vect
@@ -45,154 +35,24 @@ class SimpleColumnRenderer:
         self.column_geometries = {}
         self.generate_all_column_geometries()
 
-        # generate filter planes for each eye
-        self.generate_filter_planes()
-
         # exp parmas
         self.trials = []
         self.current_trial = 0
         self.responses = []
         self.experiment_data = []
 
-    def calculate_eye_position(self, eye):
-
-        #i shouldve just used the camera pos +- the good pos, which is techically what i end up doing
-
-        up_vector = [0, 1, 0]
-        vx, vy, vz = self.viewing_vector
-
-        right_x = vy * up_vector[2] - vz * up_vector[1]
-        right_y = vz * up_vector[0] - vx * up_vector[2]
-        right_z = vx * up_vector[1] - vy * up_vector[0]
-
-        # normalize right vector
-        right_length = math.sqrt(right_x ** 2 + right_y ** 2 + right_z ** 2)
-        right_x /= right_length
-        right_y /= right_length
-        right_z /= right_length
-
-        # offset camera by half eye separation
-        offset = self.eye_separation / 2.0
-        if eye == 'left':
-            offset = -offset
-
-        eye_x = self.camera_pos[0] + offset * right_x
-        eye_y = self.camera_pos[1] + offset * right_y
-        eye_z = self.camera_pos[2] + offset * right_z
-
-        return [eye_x, eye_y, eye_z]
-
-    def generate_filter_planes(self):
-        # position filter planes close enough to eye but far enough to cover full FOV
-        filter_distance = 0.5  # distance from eye to filter plane
-
-        # get from gov
-        aspect_ratio = self.win.size[0] / self.win.size[1]
-        fov_radians = math.radians(45.0)
-
-        # size for FOV
-        filter_height = 2.0 * filter_distance * math.tan(fov_radians / 2.0)
-        filter_width = filter_height * aspect_ratio
-
-        # my filter didnt cover anything
-        filter_height *= 1.5
-        filter_width *= 1.5
-
-        # left eye filter (red) - positioned in front of left eye
-        left_filter_pos = [
-            self.left_eye_pos[0] + filter_distance * self.viewing_vector[0],
-            self.left_eye_pos[1] + filter_distance * self.viewing_vector[1],
-            self.left_eye_pos[2] + filter_distance * self.viewing_vector[2]
-        ]
-
-        # right eye filter (cyan) - positioned in front of right eye
-        right_filter_pos = [
-            self.right_eye_pos[0] + filter_distance * self.viewing_vector[0],
-            self.right_eye_pos[1] + filter_distance * self.viewing_vector[1],
-            self.right_eye_pos[2] + filter_distance * self.viewing_vector[2]
-        ]
-
-        # create filter plane vertices (sized to cover full FOV)
-        self.left_filter_vertices = self.create_filter_quad(left_filter_pos, filter_width, filter_height)
-        self.right_filter_vertices = self.create_filter_quad(right_filter_pos, filter_width, filter_height)
-
-    def create_filter_quad(self, center_pos, width, height):
-        # get right and up vectors relative to viewing direction
-        up_vector = [0, 1, 0]
-        vx, vy, vz = self.viewing_vector
-
-        # right vector (perpendicular to viewing vector)
-        right_x = vy * up_vector[2] - vz * up_vector[1]
-        right_y = vz * up_vector[0] - vx * up_vector[2]
-        right_z = vx * up_vector[1] - vy * up_vector[0]
-
-        # normalize right vector
-        right_length = math.sqrt(right_x ** 2 + right_y ** 2 + right_z ** 2)
-        right_x /= right_length
-        right_y /= right_length
-        right_z /= right_length
-
-        # up vector perpendicular to both viewing and right vectors
-        up_x = right_y * vz - right_z * vy
-        up_y = right_z * vx - right_x * vz
-        up_z = right_x * vy - right_y * vx
-
-        half_width = width / 2.0
-        half_height = height / 2.0
-        cx, cy, cz = center_pos
-
-        # create quad vertices using both right and up vectors for proper orientation
-        vertices = [
-            # triangle 1
-            (cx - half_width * right_x - half_height * up_x,
-             cy - half_width * right_y - half_height * up_y,
-             cz - half_width * right_z - half_height * up_z),
-            (cx + half_width * right_x - half_height * up_x,
-             cy + half_width * right_y - half_height * up_y,
-             cz + half_width * right_z - half_height * up_z),
-            (cx - half_width * right_x + half_height * up_x,
-             cy - half_width * right_y + half_height * up_y,
-             cz - half_width * right_z + half_height * up_z),
-            # triangle 2
-            (cx + half_width * right_x - half_height * up_x,
-             cy + half_width * right_y - half_height * up_y,
-             cz + half_width * right_z - half_height * up_z),
-            (cx + half_width * right_x + half_height * up_x,
-             cy + half_width * right_y + half_height * up_y,
-             cz + half_width * right_z + half_height * up_z),
-            (cx - half_width * right_x + half_height * up_x,
-             cy - half_width * right_y + half_height * up_y,
-             cz - half_width * right_z + half_height * up_z)
-        ]
-
-        return vertices
-
-    def render_filter_plane(self, vertices, color):
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        # disable depth testing for filter to ensure it renders on top
-        glDisable(GL_DEPTH_TEST)
-
-        # set filter color with transparency for anaglyph effect
-        glColor4f(color[0], color[1], color[2], 0.4)  # anaglyph
-
-        glBegin(GL_TRIANGLES)
-        for vertex in vertices:
-            glVertex3f(vertex[0], vertex[1], vertex[2])
-        glEnd()
-
-        # re-enable depth testing
-        glEnable(GL_DEPTH_TEST)
-        glDisable(GL_BLEND)
+        # Anaglyph 3D parameters
+        self.anaglyph_enabled = False
+        self.eye_separation_base = 0.3  # ipd (originally 0.065 but almost no result)
+        self.viewing_distance = 0.5  # distance to screen
 
     def calculate_viewing_vector(self):
-        #vx = self.look_at_point[0] - self.camera_pos[0]
-        #vy = self.look_at_point[1] - self.camera_pos[1]
-        #vz = self.look_at_point[2] - self.camera_pos[2]
-        vx=0
-        vy=-3
-        vz=-15
+        # vx = self.look_at_point[0] - self.camera_pos[0]
+        # vy = self.look_at_point[1] - self.camera_pos[1]
+        # vz = self.look_at_point[2] - self.camera_pos[2]
+        vx = 0
+        vy = -3
+        vz = -15
 
         # Normalize vector
         length = math.sqrt(vx * vx + vy * vy + vz * vz)
@@ -203,6 +63,60 @@ class SimpleColumnRenderer:
         y = self.camera_pos[1] + distance * self.viewing_vector[1]
         z = self.camera_pos[2] + distance * self.viewing_vector[2]
         return [x, y, z]
+
+    def calculate_eye_separation(self, disparity_degrees):
+        if disparity_degrees == 0:
+            return 0
+
+        # Convert disparity to radians
+        disparity_radians = math.radians(disparity_degrees)
+
+        # Calculate separation based on viewing distance and desired disparity
+        # For small angles: separation = disparity * viewing_distance
+        separation = disparity_radians * self.viewing_distance
+
+        # capped sepearation
+        max_separation = self.eye_separation_base * 2
+        return min(separation, max_separation)
+
+    def get_stereo_camera_positions(self, disparity_degrees):
+        eye_separation = self.calculate_eye_separation(disparity_degrees)
+
+        # Calculate right vector (perpendicular to viewing direction)
+        # Since viewing vector is mostly in -z direction, right vector is mostly in +x
+        up_vector = [0, 1, 0]
+        viewing_vec = self.viewing_vector
+
+        # Cross product to get right vector
+        right_x = viewing_vec[1] * up_vector[2] - viewing_vec[2] * up_vector[1]
+        right_y = viewing_vec[2] * up_vector[0] - viewing_vec[0] * up_vector[2]
+        right_z = viewing_vec[0] * up_vector[1] - viewing_vec[1] * up_vector[0]
+
+        # Normalize right vector
+        right_length = math.sqrt(right_x ** 2 + right_y ** 2 + right_z ** 2)
+        if right_length > 0:
+            right_x /= right_length
+            right_y /= right_length
+            right_z /= right_length
+        else:
+            right_x, right_y, right_z = 1, 0, 0  # Default to x-axis
+
+        # Calculate left and right eye positions
+        half_separation = eye_separation / 2
+
+        left_eye_pos = [
+            self.camera_pos[0] - half_separation * right_x,
+            self.camera_pos[1] - half_separation * right_y,
+            self.camera_pos[2] - half_separation * right_z
+        ]
+
+        right_eye_pos = [
+            self.camera_pos[0] + half_separation * right_x,
+            self.camera_pos[1] + half_separation * right_y,
+            self.camera_pos[2] + half_separation * right_z
+        ]
+
+        return left_eye_pos, right_eye_pos
 
     def calculate_required_square_size(self):
         max_column_width = 0
@@ -414,8 +328,8 @@ class SimpleColumnRenderer:
         ])
         normals.extend([(0, -1, 0)] * 6)
 
-    def setup_camera(self, eye_position):
-        # cam setup for specific eye position
+    def setup_camera(self, eye_position=None):
+        # cam setup
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         aspect_ratio = self.win.size[0] / self.win.size[1]
@@ -424,10 +338,14 @@ class SimpleColumnRenderer:
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
 
-        # cam from eye position with downward angle
+        # Use provided eye position or default camera position
+        if eye_position is None:
+            eye_position = self.camera_pos
+
+        # cam above and slight downward angle not anymore
         gluLookAt(
             eye_position[0], eye_position[1], eye_position[2],  # Eye position
-            self.look_at_point[0]+eye_position[0], self.look_at_point[1], self.look_at_point[2],  # Look at point
+            self.look_at_point[0], self.look_at_point[1], self.look_at_point[2],  # Look at point
             0.0, 1.0, 0.0  # Up vector
         )
 
@@ -463,34 +381,98 @@ class SimpleColumnRenderer:
             glVertex3f(x, y, z)
         glEnd()
 
-    def render_frame(self):
-        # determine which eye to render and swap if i need
-        self.frame_counter += 1
-        if self.frame_counter % self.eye_swap_rate == 0:
-            self.current_eye = 'right' if self.current_eye == 'left' else 'left'
-
-        # get current eye position
-        current_eye_pos = self.left_eye_pos if self.current_eye == 'left' else self.right_eye_pos
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glEnable(GL_DEPTH_TEST)
-
-        self.setup_camera(current_eye_pos)
-
+    def render_scene_geometry(self, distance_along_vector):
+        """Render the actual 3D geometry (floor and column)"""
         # render checkerboard floor
         self.render_checkerboard_floor()
 
-        # render all columns
+        # render specific column for this trial
+        self.render_column(distance_along_vector)
+
+    def render_frame(self, disparity_degrees=0):
+        """Main rendering function that handles both mono and stereo rendering"""
+        if not self.anaglyph_enabled or disparity_degrees == 0:
+            # Mono rendering
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            glEnable(GL_DEPTH_TEST)
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)  # Enable all channels
+
+            self.setup_camera()
+
+            # render checkerboard floor
+            self.render_checkerboard_floor()
+
+            # render all columns
+            for distance in good_distances_to_test:
+                self.render_column(distance)
+        else:
+            # Stereo anaglyph rendering
+            self.render_anaglyph_frame(disparity_degrees)
+
+    def render_anaglyph_frame(self, disparity_degrees):
+        left_eye_pos, right_eye_pos = self.get_stereo_camera_positions(disparity_degrees)
+
+        # clear frame first
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glEnable(GL_DEPTH_TEST)
+
+        # RED CHANNEL ONLY (left eye)
+        glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)  # ONLY RED CHANNEL
+        glClear(GL_DEPTH_BUFFER_BIT)  # clear depth buffer for left eye
+        self.setup_camera(left_eye_pos)
+
+        # all geometry for left eye
         for distance in good_distances_to_test:
             self.render_column(distance)
+        self.render_checkerboard_floor()
 
-        # render the appropriate color filter for current eye
-        if self.current_eye == 'left':
-            # red filter for left eye
-            self.render_filter_plane(self.left_filter_vertices, (1.0, 0.0, 0.0))
+        # CYAN CHANNEL ONLY
+        glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)  #ONLY CYAN (so green+blue)
+        glClear(GL_DEPTH_BUFFER_BIT)  # clear depth buffer for right eye
+        self.setup_camera(right_eye_pos)
+
+        # all geometry for right eye
+        for distance in good_distances_to_test:
+            self.render_column(distance)
+        self.render_checkerboard_floor()
+
+        # put back full color mask
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+
+    def render_trial_frame(self, trial_data):
+        #frame for 1 trial
+        distance_along_vector = trial_data['distance_along_vector']
+        disparity_degrees = trial_data.get('disparity_degrees', 0)
+
+        if not self.anaglyph_enabled or disparity_degrees == 0:
+            # no anaglyph
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            glEnable(GL_DEPTH_TEST)
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+
+            self.setup_camera()
+            self.render_scene_geometry(distance_along_vector)
         else:
-            # cyan filter for right eye
-            self.render_filter_plane(self.right_filter_vertices, (0.0, 1.0, 1.0))
+            # anaglyph
+            left_eye_pos, right_eye_pos = self.get_stereo_camera_positions(disparity_degrees)
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            glEnable(GL_DEPTH_TEST)
+
+            # left eye (red)
+            glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
+            glClear(GL_DEPTH_BUFFER_BIT)
+            self.setup_camera(left_eye_pos)
+            self.render_scene_geometry(distance_along_vector)
+
+            # right eye (cyan)
+            glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)
+            glClear(GL_DEPTH_BUFFER_BIT)
+            self.setup_camera(right_eye_pos)
+            self.render_scene_geometry(distance_along_vector)
+
+            # restore full color mask
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     def load_experiment_conditions(self, csv_filename):
         try:
@@ -528,34 +510,39 @@ class SimpleColumnRenderer:
         print("Created default experiment_conditions.csv with onplane conditions")
 
     def show_instructions(self):
+        stereo_instruction = """
+
+    ANAGLYPH 3D INSTRUCTIONS:
+    Please wear red-cyan 3D glasses (red lens on LEFT eye).
+    If you don't have 3D glasses, the experiment will run in regular 2D mode.
+    """ if self.anaglyph_enabled else ""
+
         # Instructions
         instruction_text = visual.TextStim(
             self.win,
-            text="""ANAGLYPH 3D DEPTH PERCEPTION EXPERIMENT
-(Above/Below/On Checkerboard Plane)
+            text=f"""DEPTH PERCEPTION EXPERIMENT
+    (Above/Below/On Checkerboard Plane)
+    {stereo_instruction}
+    You will see a white column positioned at different locations.
+    The ground is a checkerboard pattern with white and transparent squares.
 
-*** WEAR RED-CYAN 3D GLASSES FOR PROPER EFFECT ***
+    IMPORTANT: The column is always CENTERED within a transparent square
+    and never touches the white squares. This ensures you judge depth 
+    purely from visual cues, not occlusion!
 
-You will see a white column positioned at different locations in 3D.
-The ground is a checkerboard pattern with white and transparent squares.
+    Your task is to judge whether the column appears:
 
-IMPORTANT: The column is always CENTERED within a transparent square
-and never touches the white squares. This ensures you judge depth 
-purely from visual cues, not occlusion!
+    ABOVE the checkerboard plane (press 'W')
+    BELOW the checkerboard plane (press 'S')
+    ON the checkerboard plane (press 'SPACE')
 
-Your task is to judge whether the column appears:
+    The column size adjusts for distance to maintain constant visual angle.
+    Take your time and be as accurate as possible.
+    The column will disappear after a few seconds.
 
-ABOVE the checkerboard plane (press 'W')
-BELOW the checkerboard plane (press 'S')
-ON the checkerboard plane (press 'SPACE')
-
-The column size adjusts for distance to maintain constant visual angle.
-Take your time and be as accurate as possible.
-The column will disappear after a few seconds.
-
-Press SPACE to begin the experiment.
-Press ESC to quit at any time.""",
-            height=26,
+    Press SPACE to begin the experiment.
+    Press ESC to quit at any time.""",
+            height=22,
             wrapWidth=800,
             color='white',
             pos=(0, 0)
@@ -620,6 +607,7 @@ Press ESC to quit at any time.""",
             'correct_answer': correct_answer,
             'is_correct': is_correct,
             'response_time': response_time,
+            'anaglyph_enabled': self.anaglyph_enabled,
             'timestamp': datetime.now().isoformat()
         }
 
@@ -631,7 +619,8 @@ Press ESC to quit at any time.""",
         if not self.experiment_data:
             return
 
-        filename = f"anaglyph_results_{participant_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        stereo_suffix = "_anaglyph" if self.anaglyph_enabled else "_mono"
+        filename = f"simple_results_{participant_id}{stereo_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df = pd.DataFrame(self.experiment_data)
         df.to_csv(filename, index=False)
 
@@ -647,7 +636,8 @@ Press ESC to quit at any time.""",
         onplane_correct = sum(1 for trial in onplane_trials if trial['is_correct'])
         offplane_correct = sum(1 for trial in offplane_trials if trial['is_correct'])
 
-        print(f"Results saved to {filename}")
+        mode_str = "Anaglyph 3D" if self.anaglyph_enabled else "Mono 2D"
+        print(f"Results saved to {filename} ({mode_str} mode)")
         print(f"Overall Accuracy: {correct_responses}/{total_responses} ({accuracy:.1%})")
         if onplane_trials:
             print(
@@ -656,36 +646,6 @@ Press ESC to quit at any time.""",
             print(
                 f"Off-plane Accuracy: {offplane_correct}/{len(offplane_trials)} ({offplane_correct / len(offplane_trials):.1%})")
 
-    def render_trial_frame(self, trial_data):
-        distance_along_vector = trial_data['distance_along_vector']
-
-        # determine which eye to render and swap if needed
-        self.frame_counter += 1
-        if self.frame_counter % self.eye_swap_rate == 0:
-            self.current_eye = 'right' if self.current_eye == 'left' else 'left'
-
-        # get current eye position
-        current_eye_pos = self.left_eye_pos if self.current_eye == 'left' else self.right_eye_pos
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glEnable(GL_DEPTH_TEST)
-
-        self.setup_camera(current_eye_pos)
-
-        # render checkerboard floor
-        self.render_checkerboard_floor()
-
-        # render specific column for this trial
-        self.render_column(distance_along_vector)
-
-        # render the appropriate color filter for current eye
-        if self.current_eye == 'left':
-            # red filter for left eye
-            self.render_filter_plane(self.left_filter_vertices, (1.0, 0.0, 0.0))
-        else:
-            # cyan filter for right eye
-            self.render_filter_plane(self.right_filter_vertices, (0.0, 1.0, 1.0))
-
     def run_experiment(self):
         # full exp
         # get id
@@ -693,12 +653,14 @@ Press ESC to quit at any time.""",
         dlg.addField('Participant ID:')
         dlg.addField('Age:')
         dlg.addField('Gender:')
+        dlg.addField('Enable Anaglyph 3D:', initial=True)
 
         participant_info = dlg.show()
         if dlg.OK == False:
             return
 
         participant_id = participant_info[0]
+        self.anaglyph_enabled = participant_info[3]
 
         self.load_experiment_conditions('experiment_conditions.csv')
         self.show_instructions()
@@ -743,12 +705,24 @@ Press ESC to quit at any time.""",
         event.waitKeys()
 
     def run_demo(self):
-        print("Rendering anaglyph 3D structures...")
-        print("*** WEAR RED-CYAN 3D GLASSES FOR PROPER EFFECT ***")
+        # Ask about anaglyph mode for demo
+        mode_dlg = gui.Dlg(title="Demo Settings")
+        mode_dlg.addField('Enable Anaglyph 3D:', initial=False)
+        mode_dlg.addField('Disparity (degrees):', initial=0.3)
+        mode_info = mode_dlg.show()
+
+        if mode_dlg.OK == False:
+            return
+
+        self.anaglyph_enabled = mode_info[0]
+        demo_disparity = mode_info[1]
+
+        stereo_msg = " (ANAGLYPH 3D - wear red-cyan glasses)" if self.anaglyph_enabled else " (2D MODE)"
+        print(f"Rendering OpenGL structures in white{stereo_msg}...")
         print("Press ESC to quit, SPACE to continue")
 
         while True:
-            self.render_frame()
+            self.render_frame(demo_disparity)
             self.win.flip()
 
             # Check for key presses
@@ -773,12 +747,12 @@ def run_depth_perception_study():
         )
         win.recordFrameIntervals = False
 
-        print("Initializing anaglyph 3D depth perception study...")
+        print("Initializing depth perception study...")
         renderer = SimpleColumnRenderer(win)
 
         # choose mode
         mode_dlg = gui.Dlg(title="Select Mode")
-        mode_dlg.addField('Mode:', choices=['Demo', 'Experiment']) # demo doesnt work somehow it spawns two columns
+        mode_dlg.addField('Mode:', choices=['Demo', 'Experiment'])
         mode_info = mode_dlg.show()
 
         if mode_dlg.OK == False:
