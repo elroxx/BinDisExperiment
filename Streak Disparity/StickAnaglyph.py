@@ -17,9 +17,9 @@ stick_length = 100
 stick_width = 4
 stim_duration = 8.0
 response_keys = ['left', 'right']
-theta_values = [1, 2, 3, 4, 5, 6, 7, 10]  # Different disparity angles in degrees
+theta_values = [2, 4, 6, 8, 10, 12]  # Different disparity angles in degrees
 n_trials = 15
-separation_distance = 400  # Distance between left and right anaglyph images
+separation_distance = 100  # Distance between left and right anaglyph images
 
 
 def create_stick_coords(center_x, center_y, angle_deg, length):
