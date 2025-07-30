@@ -30,15 +30,18 @@ right_win = visual.Window(
 #params
 stick_length = 100
 stick_width = 4
-stim_duration = 1.5 #either I can put 2 if I want it longer, or 1 seconds to make them speed up a little bit
+stim_duration = 3 #either I can put 2 if I want it longer, or 1 seconds to make them speed up a little bit 1.5 is tooo quick
 response_keys = ['left', 'right']
 #theta_values = [2, 4, 6, 8]
-theta_values = [0.06, 0.12, 0.24, 0.6, 1, 2, 4]
+theta_values = [0.03, 0.06, 0.12, 0.24, 0.6, 1, 2, 4] #so in inclination degrees [0.25, 0.5, 1, 2, 5, 8.3, 17, 35] the 17 and 35 are not following small angle approx anymore tho
 #theta_values = [4, 8, 12, 16, 20, 24]
 trials_per_theta = 10
 n_trials = len(theta_values) * trials_per_theta  # so 40 total
 separation_distance = 100
-ping_sound = sound.Sound(value=400, secs=0.05, hamming=True)
+
+# pings
+ping_sound = sound.Sound(value=400, secs=0.05, hamming=True)  # feedback on keypress
+change_sound = sound.Sound(value=800, secs=0.1, hamming=True)  # when timeout
 
 # randomize my list with 10 of each
 trial_list = []
@@ -119,10 +122,6 @@ with open(csv_filename, 'w', newline='') as f:
     writer.writerow(['trial', 'left_theta', 'right_theta', 'correct_answer', 'response', 'correct', 'reaction_time'])
 
     for trial_num in range(1, n_trials + 1):
-        #random value once, and randomly choose the one
-        #theta_single_list = random.sample(theta_values, 1)
-        #theta = theta_single_list[0]
-
         theta = trial_list[trial_num - 1] #theta is preshuffled now
         correct = random.randint(0, 1)
         if correct == 0:
@@ -131,7 +130,6 @@ with open(csv_filename, 'w', newline='') as f:
         else:
             left_theta= -theta
             right_theta = theta
-
 
         # correct answer
         correct_answer = 'left' if correct == 0 else 'right'
@@ -158,50 +156,24 @@ with open(csv_filename, 'w', newline='') as f:
         left_win.flip()
         right_win.flip()
 
-        #core.wait(stim_duration)
-
-        # clear+get response
-        #left_win.flip()
-        #right_win.flip()
-
+        # wait for timeout
         clock = core.Clock()
-        keys = event.waitKeys(keyList=response_keys + ['escape'], timeStamped=clock)
+        keys = event.waitKeys(keyList=response_keys + ['escape'], timeStamped=clock, maxWait=stim_duration)
 
         if keys:
             key, rt = keys[0]
-            ping_sound.play()
+            ping_sound.play()  # Play response feedback sound
             if key == 'escape':
                 print("Experiment aborted by user.")
                 break
         else:
+            # TIMEOUT
             key, rt = 'none', 'NA'
+            change_sound.play()
+            is_correct = False  # incorrect
 
-        # if good
-        is_correct = (key == correct_answer)
-
-        # feedback
-        #PROBABLY PLAY A SOUND
-        """if key != 'none':
-            if is_correct:
-                feedback_text = f"Correct! Left: {left_theta}°, Right: {right_theta}°"
-                feedback_color = 'green'
-            else:
-                feedback_text = f"Incorrect. Left: {left_theta}°, Right: {right_theta}°"
-                feedback_color = 'red'
-        else:
-            feedback_text = "No response detected"
-            feedback_color = 'white'
-
-        feedback_left = visual.TextStim(left_win, text=feedback_text, pos=[0, 0],
-                                        color=feedback_color, height=16)
-        feedback_right = visual.TextStim(right_win, text=feedback_text, pos=[0, 0],
-                                         color=feedback_color, height=16)
-
-        feedback_left.draw()
-        feedback_right.draw()
-        left_win.flip()
-        right_win.flip()
-        core.wait(1.5)"""
+        if key != 'none':
+            is_correct = (key == correct_answer)
 
         print(
             f"Trial {trial_num} | Left θ: {left_theta}° | Right θ: {right_theta}° | Correct: {correct_answer} | Response: {key} | Accuracy: {is_correct} | RT: {rt}")
