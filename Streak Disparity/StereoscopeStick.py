@@ -5,15 +5,15 @@ import numpy as np
 
 
 #window dimensions
-window_width = 600
-window_height = 600
+window_width =  300 # 600 originally
+window_height = 300 #600 originally
 
 left_win = visual.Window(
     size=[window_width, window_height],
     color=[-1, -1, -1],
     units='pix',
     fullscr=False,
-    pos=[100, 50],  # left window
+    pos=[450, 300],  # left window
     screen=0
 )
 
@@ -22,16 +22,16 @@ right_win = visual.Window(
     color=[-1, -1, -1],
     units='pix',
     fullscr=False,
-    pos=[window_width + 120, 50],  #right window
+    pos=[window_width + 450, 300],  #right window
     screen=0
 )
 
 #params
 stick_length = 100
 stick_width = 4
-stim_duration = 8.0
+stim_duration = 20.0
 response_keys = ['left', 'right']
-theta_values = [2, 4, 6, 8, 10, 12]
+theta_values = [2, 4, 6, 8]
 #theta_values = [4, 8, 12, 16, 20, 24]
 n_trials = 15
 separation_distance = 100
