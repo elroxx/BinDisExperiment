@@ -34,9 +34,17 @@ stim_duration = 1.5 #either I can put 2 if I want it longer, or 1 seconds to mak
 response_keys = ['left', 'right']
 theta_values = [2, 4, 6, 8]
 #theta_values = [4, 8, 12, 16, 20, 24]
-n_trials = 15
+trials_per_theta = 10
+n_trials = len(theta_values) * trials_per_theta  # so 40 total
 separation_distance = 100
 ping_sound = sound.Sound(value=400, secs=0.05, hamming=True)
+
+# randomize my list with 10 of each
+trial_list = []
+for theta in theta_values:
+    for _ in range(trials_per_theta):
+        trial_list.append(theta)
+random.shuffle(trial_list)
 
 
 def create_stick_coords(center_x, center_y, angle_deg, length):
@@ -111,8 +119,10 @@ with open(csv_filename, 'w', newline='') as f:
 
     for trial_num in range(1, n_trials + 1):
         #random value once, and randomly choose the one
-        theta_single_list = random.sample(theta_values, 1)
-        theta = theta_single_list[0]
+        #theta_single_list = random.sample(theta_values, 1)
+        #theta = theta_single_list[0]
+
+        theta = trial_list[trial_num - 1] #theta is preshuffled now
         correct = random.randint(0, 1)
         if correct == 0:
             left_theta = theta
