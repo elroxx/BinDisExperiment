@@ -3,13 +3,6 @@ import numpy as np
 import csv
 import random
 
-# PIXEL-PERFECT ANAGLYPH RENDERING:
-# - Maintains full 1200×600 resolution for visual quality
-# - Uses pixel-level computation to properly blend colors where lines overlap
-# - White pixels appear where red and cyan lines intersect (proper anaglyph effect)
-# - Optimized computation: only processes pixels where lines are present
-# - All other pixels assumed to be black background
-
 win = visual.Window(size=[1200, 600], color=[-1, -1, -1], units='pix', fullscr=False, blendMode='add')
 
 # parameters
@@ -17,9 +10,9 @@ stick_length = 100
 stick_width = 4
 stim_duration = 8.0
 response_keys = ['left', 'right']
-theta_values = [2, 4, 6, 8, 10, 12]  # Different disparity angles in degrees
+theta_values = [2, 4, 6, 8] #12 cannot fuse at all. over 8 probably cannot fuse either so remove 10 and 12
 n_trials = 15
-separation_distance = 100  # Distance between left and right anaglyph images
+separation_distance = 100
 
 
 def create_stick_coords(center_x, center_y, angle_deg, length):
@@ -152,13 +145,11 @@ def create_pixel_perfect_image(left_theta, right_theta, window_size=None):
 
     image = np.zeros((height, width, 3), dtype=np.uint8)
 
-    # Get only pixels that could contain lines
     line_pixels = get_all_line_pixels(left_theta, right_theta)
 
     for array_x, array_y in line_pixels:
-        # Convert from array coordinates to PsychoPy coordinates
         psychopy_x = array_x - width / 2
-        psychopy_y = height / 2 - array_y  # Flip Y axis
+        psychopy_y = height / 2 - array_y
 
         color = compute_pixel_color(psychopy_x, psychopy_y, left_theta, right_theta)
 
@@ -168,7 +159,7 @@ def create_pixel_perfect_image(left_theta, right_theta, window_size=None):
             image[array_y, array_x] = [0, 255, 255]
         elif color == 'white':
             image[array_y, array_x] = [255, 255, 255]
-        # black pixels remain [0, 0, 0]
+        # black are still black
 
     return image
 
@@ -211,14 +202,13 @@ instructions.draw()
 win.flip()
 event.waitKeys(keyList=['space'])
 
-# CSV file for data collection
+#csv
 with open('anaglyph_responses.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(
         ['trial', 'left_theta', 'right_theta', 'correct_answer', 'response', 'correct', 'reaction_time', 'red_pixels',
          'cyan_pixels', 'white_pixels', 'black_pixels'])
 
-    # Run trials
     for trial_num in range(1, n_trials + 1):
         # get two different random values
         theta_pair = random.sample(theta_values, 2)
@@ -239,20 +229,18 @@ with open('anaglyph_responses.csv', 'w', newline='') as f:
         # set img data
         image_stim.image = pixel_image_normalized
 
-        # Draw the new stim
         image_stim.draw()
 
-        # Add trial info at top
         trial_info = visual.TextStim(win,
                                      text=f'Trial {trial_num}/{n_trials} - Which has MORE disparity?',
                                      pos=[0, 250], color='yellow', height=18)
         trial_info.draw()
 
         # pixel comp
-        pixel_info = visual.TextStim(win,
-                                     text=f'L:{left_theta}° R:{right_theta}° | Red:{pixel_percentages["red"]:.1f}% Cyan:{pixel_percentages["cyan"]:.1f}% White:{pixel_percentages["white"]:.1f}% | Computed: {len(get_all_line_pixels(left_theta, right_theta)):,} pixels',
-                                     pos=[0, -250], color='white', height=12)
-        pixel_info.draw()
+        #pixel_info = visual.TextStim(win,
+                                     #text=f'L:{left_theta}° R:{right_theta}° | Red:{pixel_percentages["red"]:.1f}% Cyan:{pixel_percentages["cyan"]:.1f}% White:{pixel_percentages["white"]:.1f}% | Computed: {len(get_all_line_pixels(left_theta, right_theta)):,} pixels',
+                                     #pos=[0, -250], color='white', height=12)
+        #pixel_info.draw()
 
         win.flip()
 
@@ -265,14 +253,12 @@ with open('anaglyph_responses.csv', 'w', newline='') as f:
 
         core.wait(stim_duration)
 
-        # Clear screen and get response
         win.flip()
 
-        # Get response with timing
+        # get tresponse
         clock = core.Clock()
         keys = event.waitKeys(keyList=response_keys + ['escape'], timeStamped=clock)
 
-        # Handle response
         if keys:
             key, rt = keys[0]
             if key == 'escape':
@@ -281,10 +267,10 @@ with open('anaglyph_responses.csv', 'w', newline='') as f:
         else:
             key, rt = 'none', 'NA'
 
-        # Check if response is correct
+        # response correct
         is_correct = (key == correct_answer)
 
-        # Provide feedback
+        # feedback
         if key != 'none':
             if is_correct:
                 feedback_text = f"Correct! Left: {left_theta}°, Right: {right_theta}°"
@@ -321,7 +307,7 @@ with open('anaglyph_responses.csv', 'w', newline='') as f:
 
         core.wait(0.5)
 
-# Show results
+# results
 print("\nExperiment completed!")
 results_text = visual.TextStim(win,
                                text='Experiment completed!\nPixel-perfect anaglyph rendering with proper color blending\nCheck anaglyph_responses.csv for results\nPress any key to exit',

@@ -32,6 +32,7 @@ stick_width = 4
 stim_duration = 8.0
 response_keys = ['left', 'right']
 theta_values = [2, 4, 6, 8, 10, 12]
+#theta_values = [4, 8, 12, 16, 20, 24]
 n_trials = 15
 separation_distance = 100
 
