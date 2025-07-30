@@ -1,7 +1,8 @@
-from psychopy import visual, event, core
+from psychopy import visual, event, core, sound
 import csv
 import random
 import numpy as np
+from datetime import datetime
 
 
 #window dimensions
@@ -29,12 +30,13 @@ right_win = visual.Window(
 #params
 stick_length = 100
 stick_width = 4
-stim_duration = 20.0
+stim_duration = 1.5 #either I can put 2 if I want it longer, or 1 seconds to make them speed up a little bit
 response_keys = ['left', 'right']
 theta_values = [2, 4, 6, 8]
 #theta_values = [4, 8, 12, 16, 20, 24]
 n_trials = 15
 separation_distance = 100
+ping_sound = sound.Sound(value=400, secs=0.05, hamming=True)
 
 
 def create_stick_coords(center_x, center_y, angle_deg, length):
@@ -83,12 +85,12 @@ def create_line_stimuli(left_theta, right_theta, left_window, right_window):
 
 # instructions on both
 instructions_left = visual.TextStim(left_win,
-                                    text='STEREOSCOPE EXPERIMENT\nLEFT EYE\n\nCompare inclination between images\nLEFT arrow: left is more inclined\nRIGHT arrow: right is more inclined\nESC: quit\n\nPress SPACE to start',
-                                    pos=[0, 0], color='white', height=16, wrapWidth=500)
+                                    text='STEREOSCOPE EXPERIMENT\n            LEFT EYE\n\nCompare inclination between images\nLEFT arrow: left has the bottom coming towards you (floor)\nRIGHT arrow: right has the bottom coming towards you (floor)\nESC: quit\n\nPress SPACE to start',
+                                    pos=[0, 0], color='white', height=12, wrapWidth=280)
 
 instructions_right = visual.TextStim(right_win,
-                                     text='STEREOSCOPE EXPERIMENT\nRIGHT EYE\n\nCompare inclination between images\nLEFT arrow: left is more inclined\nRIGHT arrow: right is more inclined\nESC: quit\n\nPress SPACE to start',
-                                     pos=[0, 0], color='white', height=16, wrapWidth=500)
+                                     text='STEREOSCOPE EXPERIMENT\nRIGHT           EYE\n\nCompare inclination between images\nLEFT arrow: left has the bottom coming towards you (floor)\nRIGHT arrow: right has the bottom coming towards you (floor)\nESC: quit\n\nPress SPACE to start',
+                                     pos=[0, 0], color='white', height=12, wrapWidth=280)
 
 # instructions on both
 instructions_left.draw()
@@ -98,18 +100,30 @@ right_win.flip()
 event.waitKeys(keyList=['space'])
 
 # csv
-with open('stereoscope_responses.csv', 'w', newline='') as f:
+
+# timestamp for name
+timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+csv_filename = f'stereoscope_responses_{timestamp}.csv'
+
+with open(csv_filename, 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(['trial', 'left_theta', 'right_theta', 'correct_answer', 'response', 'correct', 'reaction_time'])
 
     for trial_num in range(1, n_trials + 1):
-        # random 2 values
-        theta_pair = random.sample(theta_values, 2)
-        left_theta = theta_pair[0]
-        right_theta = theta_pair[1]
+        #random value once, and randomly choose the one
+        theta_single_list = random.sample(theta_values, 1)
+        theta = theta_single_list[0]
+        correct = random.randint(0, 1)
+        if correct == 0:
+            left_theta = theta
+            right_theta = -theta
+        else:
+            left_theta= -theta
+            right_theta = theta
+
 
         # correct answer
-        correct_answer = 'left' if left_theta > right_theta else 'right'
+        correct_answer = 'left' if correct == 0 else 'right'
 
         # line stimuli
         left_lines, right_lines = create_line_stimuli(left_theta, right_theta, left_win, right_win)
@@ -133,17 +147,18 @@ with open('stereoscope_responses.csv', 'w', newline='') as f:
         left_win.flip()
         right_win.flip()
 
-        core.wait(stim_duration)
+        #core.wait(stim_duration)
 
         # clear+get response
-        left_win.flip()
-        right_win.flip()
+        #left_win.flip()
+        #right_win.flip()
 
         clock = core.Clock()
         keys = event.waitKeys(keyList=response_keys + ['escape'], timeStamped=clock)
 
         if keys:
             key, rt = keys[0]
+            ping_sound.play()
             if key == 'escape':
                 print("Experiment aborted by user.")
                 break
@@ -154,7 +169,8 @@ with open('stereoscope_responses.csv', 'w', newline='') as f:
         is_correct = (key == correct_answer)
 
         # feedback
-        if key != 'none':
+        #PROBABLY PLAY A SOUND
+        """if key != 'none':
             if is_correct:
                 feedback_text = f"Correct! Left: {left_theta}°, Right: {right_theta}°"
                 feedback_color = 'green'
@@ -174,7 +190,7 @@ with open('stereoscope_responses.csv', 'w', newline='') as f:
         feedback_right.draw()
         left_win.flip()
         right_win.flip()
-        core.wait(1.5)
+        core.wait(1.5)"""
 
         print(
             f"Trial {trial_num} | Left θ: {left_theta}° | Right θ: {right_theta}° | Correct: {correct_answer} | Response: {key} | Accuracy: {is_correct} | RT: {rt}")
