@@ -32,7 +32,8 @@ stick_length = 100
 stick_width = 4
 stim_duration = 1.5 #either I can put 2 if I want it longer, or 1 seconds to make them speed up a little bit
 response_keys = ['left', 'right']
-theta_values = [2, 4, 6, 8]
+#theta_values = [2, 4, 6, 8]
+theta_values = [0.06, 0.12, 0.24, 0.6, 1, 2, 4]
 #theta_values = [4, 8, 12, 16, 20, 24]
 trials_per_theta = 10
 n_trials = len(theta_values) * trials_per_theta  # so 40 total
@@ -111,7 +112,7 @@ event.waitKeys(keyList=['space'])
 
 # timestamp for name
 timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-csv_filename = f'stereoscope_responses_{timestamp}.csv'
+csv_filename = f'responses\stereoscope_responses_{timestamp}.csv'
 
 with open(csv_filename, 'w', newline='') as f:
     writer = csv.writer(f)
