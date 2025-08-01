@@ -49,7 +49,8 @@ inter_trial_interval = 0.8  # black screen duration between trials
 response_keys = ['left', 'right']
 # theta_values = [2, 4, 6, 8]
 # theta_values = [0.03, 0.06, 0.12, 0.24, 0.6, 1, 2, 4] #so in inclination degrees [0.25, 0.5, 1, 2, 5, 8.3, 17, 35] the 17 and 35 are not following small angle approx anymore tho
-theta_values = [4, 8, 12, 16, 20, 24]
+#theta_values = [4, 8, 12, 16, 20, 24]
+theta_values = [0.25, 0.5, 1, 1.5, 2, 2.5, 4]
 trials_per_theta = 10
 n_trials = len(theta_values) * trials_per_theta  # so 40 total
 separation_distance = 100
@@ -127,7 +128,6 @@ instructions_right = visual.TextStim(right_win,
                                      pos=[0, 0], color='white', height=12, wrapWidth=280)
 
 # instructions on both (with fixation points everywhere)
-draw_fixation_points()
 instructions_left.draw()
 instructions_right.draw()
 left_win.flip()
@@ -145,7 +145,7 @@ with open(csv_filename, 'w', newline='') as f:
     writer.writerow(['trial', 'left_theta', 'right_theta', 'correct_answer', 'response', 'correct', 'reaction_time'])
 
     for trial_num in range(1, n_trials + 1):
-        # Inter-trial interval (black screen with fixation points only)
+        #blank between trials
         if trial_num > 1:  # Skip for the first trial
             draw_fixation_points()
             left_win.flip()
