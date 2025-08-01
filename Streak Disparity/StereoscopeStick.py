@@ -51,19 +51,21 @@ response_keys = ['left', 'right']
 # theta_values = [0.03, 0.06, 0.12, 0.24, 0.6, 1, 2, 4] #so in inclination degrees [0.25, 0.5, 1, 2, 5, 8.3, 17, 35] the 17 and 35 are not following small angle approx anymore tho
 #theta_values = [4, 8, 12, 16, 20, 24]
 theta_values = [0.25, 0.5, 1, 2] #so we have 1 super hard one, one super easy one, 1 relatively easy one and 2 hard ones
-trials_per_theta = 10
-n_trials = len(theta_values) * trials_per_theta  # so 40 total
+epsilon_values = [-8, -7, 3, 7, 8]  # 5 predetermined epsilon values
+repetitions_per_combo = 2  # 2 of each theta-epsilon combo
+n_trials = len(theta_values) * len(epsilon_values) * repetitions_per_combo  # 4 * 5 * 2 = 40 total
 separation_distance = 100
 
 # pings
 ping_sound = sound.Sound(value=400, secs=0.05, hamming=True)  # feedback on keypress
 change_sound = sound.Sound(value=800, secs=0.1, hamming=True)  # when timeout
 
-# randomize my list with 10 of each
+# all theta epsilon pairs
 trial_list = []
 for theta in theta_values:
-    for _ in range(trials_per_theta):
-        trial_list.append(theta)
+    for epsilon in epsilon_values:
+        for _ in range(repetitions_per_combo):
+            trial_list.append((theta, epsilon))
 random.shuffle(trial_list)
 
 
@@ -86,15 +88,13 @@ def create_stick_coords(center_x, center_y, angle_deg, length):
     return [start_x, start_y], [end_x, end_y]
 
 
-def create_line_stimuli(left_theta, right_theta, left_window, right_window):
+def create_line_stimuli(left_theta, right_theta, epsilon, left_window, right_window):
     left_center_x = -separation_distance / 2
     left_center_y = 0
     right_center_x = separation_distance / 2
     right_center_y = 0
 
-    # left == red
-    epsilon = random.uniform(-10, 10)
-
+    # left == red (now uses predetermined epsilon)
     left_red_start, left_red_end = create_stick_coords(left_center_x+epsilon, left_center_y, -left_theta / 2, stick_length)
     right_red_start, right_red_end = create_stick_coords(right_center_x, right_center_y, -right_theta / 2, stick_length)
 
@@ -144,7 +144,7 @@ csv_filename = f'responses\stereoscope_responses_{timestamp}.csv'
 
 with open(csv_filename, 'w', newline='') as f:
     writer = csv.writer(f)
-    writer.writerow(['trial', 'left_theta', 'right_theta', 'correct_answer', 'response', 'correct', 'reaction_time'])
+    writer.writerow(['trial', 'left_theta', 'right_theta', 'epsilon', 'correct_answer', 'response', 'correct', 'reaction_time'])
 
     for trial_num in range(1, n_trials + 1):
         #blank between trials
@@ -154,7 +154,7 @@ with open(csv_filename, 'w', newline='') as f:
             right_win.flip()
             core.wait(inter_trial_interval)
 
-        theta = trial_list[trial_num - 1]  # theta is preshuffled now
+        theta, epsilon = trial_list[trial_num - 1]  # Get both theta and epsilon from pre-shuffled list
         correct = random.randint(0, 1)
         if correct == 0:
             left_theta = theta
@@ -166,8 +166,8 @@ with open(csv_filename, 'w', newline='') as f:
         # correct answer
         correct_answer = 'left' if correct == 0 else 'right'
 
-        # line stimuli
-        left_lines, right_lines = create_line_stimuli(left_theta, right_theta, left_win, right_win)
+        # line stimuli (now passes epsilon as parameter)
+        left_lines, right_lines = create_line_stimuli(left_theta, right_theta, epsilon, left_win, right_win)
 
         # FIXATION POINTS
         draw_fixation_points()
@@ -211,10 +211,10 @@ with open(csv_filename, 'w', newline='') as f:
             is_correct = (key == correct_answer)
 
         print(
-            f"Trial {trial_num} | Left θ: {left_theta}° | Right θ: {right_theta}° | Correct: {correct_answer} | Response: {key} | Accuracy: {is_correct} | RT: {rt}")
+            f"Trial {trial_num} | Left θ: {left_theta}° | Right θ: {right_theta}° | Epsilon: {epsilon} | Correct: {correct_answer} | Response: {key} | Accuracy: {is_correct} | RT: {rt}")
 
-        # tocsv
-        writer.writerow([trial_num, left_theta, right_theta, correct_answer, key, is_correct, rt])
+        # tocsv (now includes epsilon)
+        writer.writerow([trial_num, left_theta, right_theta, epsilon, correct_answer, key, is_correct, rt])
 
         core.wait(0.5)
 
