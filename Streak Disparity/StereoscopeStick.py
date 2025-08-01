@@ -5,15 +5,15 @@ import numpy as np
 from datetime import datetime
 
 # window dimensions
-window_width = 300  # 600 originally
-window_height = 300  # 600 originally
+window_width = 740  # 300 originally
+window_height = 800  # 300 originally
 
 left_win = visual.Window(
     size=[window_width, window_height],
     color=[-1, -1, -1],
     units='pix',
     fullscr=False,
-    pos=[450, 300],  # left window
+    pos=[5, 50],  # left window
     screen=0
 )
 
@@ -22,7 +22,7 @@ right_win = visual.Window(
     color=[-1, -1, -1],
     units='pix',
     fullscr=False,
-    pos=[window_width + 450, 300],  # right window
+    pos=[window_width + 5, 50],  # right window
     screen=0
 )
 
@@ -42,7 +42,7 @@ fixation_right_vertical = visual.Line(right_win,
                                       lineWidth=2, lineColor='white')
 
 # params
-stick_length = 150
+stick_length = 300
 stick_width = 0.5
 stim_duration = 3  # either I can put 2 if I want it longer, or 1 seconds to make them speed up a little bit 1.5 is tooo quick
 inter_trial_interval = 0.8  # black screen duration between trials
@@ -50,7 +50,7 @@ response_keys = ['left', 'right']
 # theta_values = [2, 4, 6, 8]
 # theta_values = [0.03, 0.06, 0.12, 0.24, 0.6, 1, 2, 4] #so in inclination degrees [0.25, 0.5, 1, 2, 5, 8.3, 17, 35] the 17 and 35 are not following small angle approx anymore tho
 #theta_values = [4, 8, 12, 16, 20, 24]
-theta_values = [0.25, 0.5, 1, 1.5, 2, 2.5, 4]
+theta_values = [0.25, 0.5, 1]
 trials_per_theta = 10
 n_trials = len(theta_values) * trials_per_theta  # so 40 total
 separation_distance = 100
@@ -93,7 +93,9 @@ def create_line_stimuli(left_theta, right_theta, left_window, right_window):
     right_center_y = 0
 
     # left == red
-    left_red_start, left_red_end = create_stick_coords(left_center_x, left_center_y, -left_theta / 2, stick_length)
+    epsilon = random.uniform(-10, 10)
+
+    left_red_start, left_red_end = create_stick_coords(left_center_x+epsilon, left_center_y, -left_theta / 2, stick_length)
     right_red_start, right_red_end = create_stick_coords(right_center_x, right_center_y, -right_theta / 2, stick_length)
 
     left_red_line = visual.Line(left_window,
@@ -120,7 +122,7 @@ def create_line_stimuli(left_theta, right_theta, left_window, right_window):
 
 # instructions on both
 instructions_left = visual.TextStim(left_win,
-                                    text='STEREOSCOPE EXPERIMENT\n            LEFT EYE\n\nCompare inclination between images\nLEFT arrow: left has the bottom coming towards you (floor)\nRIGHT arrow: right has the bottom coming towards you (floor)\nESC: quit\n\nPress SPACE to start',
+                                    text='STEREOSCOPE EXPERIMENT\n              LEFT EYE\n\nCompare inclination between images\nLEFT arrow: left has the bottom coming towards you (floor)\nRIGHT arrow: right has the bottom coming towards you (floor)\nESC: quit\n\nPress SPACE to start',
                                     pos=[0, 0], color='white', height=12, wrapWidth=280)
 
 instructions_right = visual.TextStim(right_win,
@@ -176,7 +178,7 @@ with open(csv_filename, 'w', newline='') as f:
         for line in right_lines:
             line.draw()
 
-        trial_info_left = visual.TextStim(left_win,
+        """trial_info_left = visual.TextStim(left_win,
                                           text=f'Trial {trial_num}/{n_trials}\nLEFT EYE\nWhich is more inclined?',
                                           pos=[0, 250], color='yellow', height=14)
         trial_info_right = visual.TextStim(right_win,
@@ -184,7 +186,7 @@ with open(csv_filename, 'w', newline='') as f:
                                            pos=[0, 250], color='yellow', height=14)
 
         trial_info_left.draw()
-        trial_info_right.draw()
+        trial_info_right.draw()"""
 
         left_win.flip()
         right_win.flip()
