@@ -108,7 +108,7 @@ def analyze_stereoscope_data():
     ax1.set_ylim(0, 1)
     ax1.legend()
 
-    #combined accuracy + std as error bars
+    #combined accuracy + std error of mean as error bars
     accuracy_stats = combined_df.groupby('theta_magnitude')['accuracy'].agg(['mean', 'std', 'count'])
     accuracy_stats['sem'] = accuracy_stats['std'] / np.sqrt(accuracy_stats['count'])
 

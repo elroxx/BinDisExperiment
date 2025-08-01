@@ -28,8 +28,8 @@ right_win = visual.Window(
 )
 
 #params
-stick_length = 100
-stick_width = 4
+stick_length = 150
+stick_width = 0.5
 stim_duration = 3 #either I can put 2 if I want it longer, or 1 seconds to make them speed up a little bit 1.5 is tooo quick
 response_keys = ['left', 'right']
 #theta_values = [2, 4, 6, 8]
