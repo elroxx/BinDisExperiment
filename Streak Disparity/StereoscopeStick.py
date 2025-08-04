@@ -6,14 +6,14 @@ from datetime import datetime
 
 # window dimensions
 window_width = 740  # 300 originally
-window_height = 800  # 300 originally
+window_height = 920  # 300 originally
 
 left_win = visual.Window(
     size=[window_width, window_height],
     color=[-1, -1, -1],
     units='pix',
     fullscr=False,
-    pos=[5, 50],  # left window
+    pos=[5, 0],  # left window
     screen=0
 )
 
@@ -22,7 +22,7 @@ right_win = visual.Window(
     color=[-1, -1, -1],
     units='pix',
     fullscr=False,
-    pos=[window_width + 5, 50],  # right window
+    pos=[window_width + 5, 0],  # right window
     screen=0
 )
 
