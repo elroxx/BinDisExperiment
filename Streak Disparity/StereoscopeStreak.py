@@ -30,7 +30,7 @@ right_win = visual.Window(
 
 
 # params
-stim_duration = 30  # stimulus display duration
+stim_duration = 600  # stimulus display duration
 inter_trial_interval = 0.8  # black screen duration between trials
 response_keys = ['left', 'right']
 repetitions_per_theta = 2  # number of repetitions per theta value
