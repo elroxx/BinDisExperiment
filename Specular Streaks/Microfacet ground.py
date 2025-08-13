@@ -2,6 +2,7 @@ from psychopy import visual, core, event
 from pyglet.gl import *
 import random
 
+
 #HAVE TO FIX THE GROUND TEXTURE FOR THE MICROFACETS STUFF IN THE REFLECTION
 class SpecularStreakScene:
     def __init__(self, win):

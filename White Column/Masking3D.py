@@ -414,7 +414,6 @@ class SimpleColumnRenderer:
             self.render_anaglyph_frame(disparity_degrees)
 
     def render_anaglyph_frame(self, disparity_degrees=None):
-        """Render the scene using anaglyph stereo with fixed eye separation (vergence at infinity)"""
         left_eye_pos, right_eye_pos = self.get_stereo_camera_positions()
 
         # Clear color and depth
