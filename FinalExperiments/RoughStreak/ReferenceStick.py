@@ -35,7 +35,7 @@ response_keys = ['left', 'right']
 repetitions_per_comparison = 2  # number of repetitions per comparison pair
 image_folder = 'StreakImages'
 
-# Reference stick parameters
+#ref stick params
 reference_theta = 2.0  # reference stick theta value in degrees
 stick_length = 300
 stick_width = 2
@@ -69,7 +69,7 @@ border_right = visual.Line(right_win, start=[0, -window_height / 2], end=[0, win
 def create_stick_coords(center_x, center_y, angle_deg, length):
     angle_rad = np.radians(angle_deg)
     half_length = length / 2
-    center_y=center_y-100
+    center_y=center_y-150
     start_x = center_x - half_length * np.sin(angle_rad)
     start_y = center_y - half_length * np.cos(angle_rad)
     end_x = center_x + half_length * np.sin(angle_rad)
@@ -79,18 +79,16 @@ def create_stick_coords(center_x, center_y, angle_deg, length):
 
 
 def create_reference_stick(theta_deg, left_window, right_window):
-    # Position the stick on the left side of each window
+    #pos
     left_center_x = -window_width / 4
     left_center_y = 0
 
-    # Create stick coordinates with opposing orientations for stereoscopic effect
-    # Left window (left eye): use -theta/2
     left_start, left_end = create_stick_coords(left_center_x, left_center_y, -theta_deg / 2, stick_length)
     left_stick = visual.Line(left_window,
                              start=left_start, end=left_end,
                              lineWidth=stick_width, lineColor='white')
 
-    # Right window (right eye): use +theta/2
+    # right window
     right_start, right_end = create_stick_coords(left_center_x, left_center_y, theta_deg / 2, stick_length)
     right_stick = visual.Line(right_window,
                               start=right_start, end=right_end,
@@ -100,7 +98,6 @@ def create_reference_stick(theta_deg, left_window, right_window):
 
 
 def get_image_pairs():
-    """Get all available theta/roughness combinations from image folder"""
     if not os.path.exists(image_folder):
         raise FileNotFoundError(f"Image folder '{image_folder}' not found!")
 
@@ -125,7 +122,6 @@ def get_image_pairs():
 
 
 def create_trial_list():
-    """Create list of trials comparing reference stick to streak images"""
     image_pairs = get_image_pairs()
 
     if not image_pairs:
@@ -135,10 +131,10 @@ def create_trial_list():
 
     trial_list = []
 
-    # Create trials where left side is always the reference stick
+    #Left side always ref stick
     for comparison_condition in image_pairs:
         for _ in range(repetitions_per_comparison):
-            # Left side is reference stick, right side is the comparison image
+            #(Left side of each window)
             trial_list.append(comparison_condition)
 
     random.shuffle(trial_list)
@@ -146,36 +142,33 @@ def create_trial_list():
 
 
 def load_and_crop_image(theta_str, roughness_str, eye, crop_side='right'):
-    """Load and crop an image to show only right half for comparison"""
     theta_filename = theta_str.replace('.', '_')
     roughness_filename = roughness_str.replace('.', '_')
 
     image_path = os.path.join(image_folder, f'theta_{theta_filename}_roughness_{roughness_filename}_{eye}_eye.png')
 
-    # Load the full image first to get its dimensions
+    #full img to get dimension
     temp_stim = visual.ImageStim(left_win, image=image_path)
     original_size = temp_stim.size
 
-    # Show right half of image, position it on the right side of window
+    #right eye on right window
     crop_size = [original_size[0] / 2, original_size[1]]
-    pos_x = window_width / 4  # position right half on right side
+    pos_x = window_width / 4  # position right eye on right side
 
     return image_path, crop_size, pos_x
 
 
 def create_stick_vs_image_stimuli(comparison_condition):
-    """Create stick (left) vs image (right) stimuli for both windows"""
     theta_str, roughness_str = comparison_condition
 
-    # Create reference stick for left side
+    #create left stick
     left_stick, right_stick = create_reference_stick(reference_theta, left_win, right_win)
 
-    # Create comparison image for right side
-    # Left window - right half of left eye image
+    # left window, left eye
     left_img_path, crop_size, pos_x = load_and_crop_image(theta_str, roughness_str, 'left', 'right')
     left_img_stim = visual.ImageStim(left_win, image=left_img_path, size=crop_size, pos=[pos_x, 0])
 
-    # Right window - right half of right eye image
+    #right window, right eye
     right_img_path, _, _ = load_and_crop_image(theta_str, roughness_str, 'right', 'right')
     right_img_stim = visual.ImageStim(right_win, image=right_img_path, size=crop_size, pos=[pos_x, 0])
 

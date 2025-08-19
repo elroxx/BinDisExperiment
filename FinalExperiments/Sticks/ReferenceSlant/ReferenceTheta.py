@@ -4,9 +4,9 @@ import random
 import numpy as np
 from datetime import datetime
 
-# HYPERPARAMETERS - MODIFY THESE AT START
-reference_theta = 5.0  # Fixed reference slant for left stick (degrees)
-delta_theta_values = [0.25, 0.5, 1, 2]  # Changes applied to right stick
+# HYPERPARAMETERS
+reference_theta = 4.0  #ref slant
+delta_theta_values = [0.25, 0.5, 1, 2]  #only right stick modification now
 
 # window dimensions
 window_width = 740  # 300 originally
@@ -65,8 +65,7 @@ trial_list = []
 for delta_theta in delta_theta_values:
     for epsilon in epsilon_values:
         for _ in range(repetitions_per_combo):
-            # Randomly choose whether delta_theta is positive or negative
-            # This creates trials where right stick can be more or less inclined than reference
+            #random choice between + or - delta
             sign = random.choice([-1, 1])
             trial_list.append((delta_theta * sign, epsilon))
 random.shuffle(trial_list)
@@ -160,7 +159,7 @@ with open(csv_filename, 'w', newline='') as f:
             right_win.flip()
             core.wait(inter_trial_interval)
 
-        delta_theta, epsilon = trial_list[trial_num - 1]  # Get both delta_theta and epsilon from pre-shuffled list
+        delta_theta, epsilon = trial_list[trial_num - 1]
 
         # Left stick always has reference angle
         left_theta = reference_theta
@@ -173,7 +172,7 @@ with open(csv_filename, 'w', newline='') as f:
         else:
             correct_answer = 'right'
 
-        # line stimuli (now passes epsilon as parameter)
+        # line stimuli
         left_lines, right_lines = create_line_stimuli(left_theta, right_theta, epsilon, left_win, right_win)
 
         # FIXATION POINTS

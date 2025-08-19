@@ -1,0 +1,8 @@
+trial,left_theta,right_theta,correct_answer,response,correct,reaction_time
+1,-6,6,right,right,True,0.2836931000056211
+2,-2,2,right,left,False,0.5241183000034653
+3,-6,6,right,right,True,0.43743999997968785
+4,-2,2,right,left,False,0.45737829999416135
+5,-6,6,right,right,True,0.03807759998016991
+6,2,-2,left,left,True,0.3162095000152476
+7,2,-2,left,right,False,0.48235900001600385

@@ -1,0 +1,8 @@
+trial,left_theta,right_theta,correct_answer,response,correct,reaction_time,red_pixels,cyan_pixels,white_pixels,black_pixels
+1,8,10,right,left,False,3.27968510001665,616,616,210,718558
+2,12,2,left,left,True,7.3180832999933045,440,440,390,718730
+3,10,8,left,left,True,8.266229699976975,616,616,210,718558
+4,8,12,right,right,True,18.16422929998953,634,634,196,718536
+5,4,10,right,left,False,4.161057099991012,514,514,312,718660
+6,8,6,left,left,True,7.661371900001541,552,552,274,718622
+7,12,4,left,left,True,3.6220341000007465,532,532,298,718638

@@ -27,11 +27,11 @@ def calculate_accuracy_by_delta(df, reference_theta):
         'correct': ['mean', 'count', 'std']
     }).round(3)
 
-    # Flatten column names
+    #flatten names
     accuracy_stats.columns = ['accuracy', 'n_trials', 'accuracy_std']
     accuracy_stats = accuracy_stats.reset_index()
 
-    # Calculate standard error
+    #std error
     accuracy_stats['accuracy_sem'] = accuracy_stats['accuracy_std'] / np.sqrt(accuracy_stats['n_trials'])
 
     return accuracy_stats.sort_values('delta_theta')
@@ -78,7 +78,7 @@ def analyze_stereoscope_data():
                 f"  Δθ = {row['delta_theta']:+.2f}°: {row['accuracy']:.3f} ± {row['accuracy_sem']:.3f} (n={int(row['n_trials'])})")
 
 
-    # Formatting
+    # Format
     plt.xlabel('Delta Theta (degrees)', fontsize=14)
     plt.ylabel('Proportion Correct', fontsize=14)
     plt.title('Psychometric Curves by Reference Theta', fontsize=16, fontweight='bold')

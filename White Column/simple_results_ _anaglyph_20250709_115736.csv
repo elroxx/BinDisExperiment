@@ -1,0 +1,3 @@
+trial_id,disparity_degrees,distance_along_vector,onplane,column_y_position,response,correct_answer,is_correct,response_time,anaglyph_enabled,timestamp
+31,2.0,25,False,-1.9029033784546003,SPACE,S,False,4.06088340000133,True,2025-07-09T11:57:30.110646
+8,0.0,25,False,-1.9029033784546003,SPACE,S,False,3.461114199999429,True,2025-07-09T11:57:33.744400
