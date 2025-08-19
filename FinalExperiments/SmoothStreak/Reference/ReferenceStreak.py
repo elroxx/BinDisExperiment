@@ -87,7 +87,6 @@ def get_image_pairs():
 
 
 def parse_reference_image(reference_filename):
-    """Parse reference image filename to extract theta and roughness values"""
     pattern = r'theta_(\d+_\d+)_roughness_(\d+_\d+)_left_eye\.png'
     match = re.match(pattern, reference_filename)
 
@@ -106,18 +105,17 @@ def create_trial_list():
     if not image_pairs:
         raise ValueError("No valid image pairs found in the StreakImages folder!")
 
-    # Determine reference condition
+    #get ref conditions
     if reference_image is not None:
-        # Parse the reference image filename
+        #parsing
         ref_theta, ref_roughness = parse_reference_image(reference_image)
         reference_condition = (ref_theta, ref_roughness)
 
-        # Check if reference condition exists in available image pairs
+        #verify if ref condition actually exists for the other eye
         if reference_condition not in image_pairs:
             raise ValueError(
                 f"Reference condition from '{reference_image}' (theta={ref_theta}, roughness={ref_roughness}) not found in image pairs!")
 
-        # Verify the actual files exist
         ref_theta_filename = ref_theta.replace('.', '_')
         ref_roughness_filename = ref_roughness.replace('.', '_')
         left_eye_path = os.path.join(image_folder, reference_image)
@@ -132,16 +130,15 @@ def create_trial_list():
         print(f"Using specified reference: {reference_image}")
         print(f"Reference condition: theta={ref_theta}, roughness={ref_roughness}")
     else:
-        # Use first available condition as reference
+        # worse scenario its first img
         reference_condition = image_pairs[0]
         print(f"Using automatic reference: theta={reference_condition[0]}, roughness={reference_condition[1]}")
 
     trial_list = []
 
-    # Create trials where left side is always the reference
+    #left side is always ref
     for comparison_condition in image_pairs:
         for _ in range(repetitions_per_comparison):
-            # Left side is always reference, right side is the comparison
             trial_list.append((reference_condition, comparison_condition))
 
     random.shuffle(trial_list)
@@ -149,42 +146,40 @@ def create_trial_list():
 
 
 def load_and_crop_image(theta_str, roughness_str, eye, crop_side='left'):
-    """Load and crop an image to show only left or right half"""
     theta_filename = theta_str.replace('.', '_')
     roughness_filename = roughness_str.replace('.', '_')
 
     image_path = os.path.join(image_folder, f'theta_{theta_filename}_roughness_{roughness_filename}_{eye}_eye.png')
 
-    # Load the full image first to get its dimensions
+    #load img for dims
     temp_stim = visual.ImageStim(left_win, image=image_path)
     original_size = temp_stim.size
 
-    # Create the cropped image stimulus
+    #cropped img stim
     if crop_side == 'left':
-        # Show left half of image, position it on the left side of window
-        crop_size = [original_size[0] / 2, original_size[1]]
+        #left half of image on the left side of window
+        crop_size = [original_size[0], original_size[1]]
         pos_x = -window_width / 4  # position left half on left side
     else:  # crop_side == 'right'
-        # Show right half of image, position it on the right side of window
-        crop_size = [original_size[0] / 2, original_size[1]]
+        #right half of image on the right side of window
+        crop_size = [original_size[0], original_size[1]]
         pos_x = window_width / 4  # position right half on right side
 
     return image_path, crop_size, pos_x
 
 
 def create_side_by_side_stimuli(left_condition, right_condition):
-    """Create side-by-side image stimuli for both windows"""
     theta1_str, roughness1_str = left_condition
     theta2_str, roughness2_str = right_condition
 
-    # Left window stimuli
+    #left window stim
     left_img1_path, crop_size, pos1_x = load_and_crop_image(theta1_str, roughness1_str, 'left', 'left')
     left_img2_path, _, pos2_x = load_and_crop_image(theta2_str, roughness2_str, 'left', 'right')
 
     left_stim1 = visual.ImageStim(left_win, image=left_img1_path, size=crop_size, pos=[pos1_x, 0])
     left_stim2 = visual.ImageStim(left_win, image=left_img2_path, size=crop_size, pos=[pos2_x, 0])
 
-    # Right window stimuli
+    #right window stim
     right_img1_path, crop_size, pos1_x = load_and_crop_image(theta1_str, roughness1_str, 'right', 'left')
     right_img2_path, _, pos2_x = load_and_crop_image(theta2_str, roughness2_str, 'right', 'right')
 

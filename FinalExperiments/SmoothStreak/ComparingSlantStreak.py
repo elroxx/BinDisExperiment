@@ -90,15 +90,13 @@ def create_trial_list():
     if not image_pairs:
         raise ValueError("No valid image pairs found in the StreakImages folder!")
 
-    # Create comparison pairs - each trial will compare two different theta values
     trial_list = []
 
-    # Generate all possible pairs of different theta values (same roughness for now)
+    # every pair
     for i, (theta1, roughness1) in enumerate(image_pairs):
         for j, (theta2, roughness2) in enumerate(image_pairs):
-            if i < j:  # avoid duplicates and self-comparisons
+            if i < j:  # avoid duplicates
                 for _ in range(repetitions_per_comparison):
-                    # Randomize which theta goes on left vs right
                     if random.random() < 0.5:
                         trial_list.append(((theta1, roughness1), (theta2, roughness2)))
                     else:
@@ -109,42 +107,38 @@ def create_trial_list():
 
 
 def load_and_crop_image(theta_str, roughness_str, eye, crop_side='left'):
-    """Load and crop an image to show only left or right half"""
     theta_filename = theta_str.replace('.', '_')
     roughness_filename = roughness_str.replace('.', '_')
 
     image_path = os.path.join(image_folder, f'theta_{theta_filename}_roughness_{roughness_filename}_{eye}_eye.png')
 
-    # Load the full image first to get its dimensions
+    #full img first for dimensaions
     temp_stim = visual.ImageStim(left_win, image=image_path)
     original_size = temp_stim.size
 
-    # Create the cropped image stimulus
+    #cropped img
     if crop_side == 'left':
-        # Show left half of image, position it on the left side of window
-        crop_size = [original_size[0] / 2, original_size[1]]
+        crop_size = [original_size[0], original_size[1]]
         pos_x = -window_width / 4  # position left half on left side
     else:  # crop_side == 'right'
-        # Show right half of image, position it on the right side of window
-        crop_size = [original_size[0] / 2, original_size[1]]
+        crop_size = [original_size[0], original_size[1]]
         pos_x = window_width / 4  # position right half on right side
 
     return image_path, crop_size, pos_x
 
 
 def create_side_by_side_stimuli(left_condition, right_condition):
-    """Create side-by-side image stimuli for both windows"""
     theta1_str, roughness1_str = left_condition
     theta2_str, roughness2_str = right_condition
 
-    # Left window stimuli
+    #left window
     left_img1_path, crop_size, pos1_x = load_and_crop_image(theta1_str, roughness1_str, 'left', 'left')
     left_img2_path, _, pos2_x = load_and_crop_image(theta2_str, roughness2_str, 'left', 'right')
 
     left_stim1 = visual.ImageStim(left_win, image=left_img1_path, size=crop_size, pos=[pos1_x, 0])
     left_stim2 = visual.ImageStim(left_win, image=left_img2_path, size=crop_size, pos=[pos2_x, 0])
 
-    # Right window stimuli
+    #right window
     right_img1_path, crop_size, pos1_x = load_and_crop_image(theta1_str, roughness1_str, 'right', 'left')
     right_img2_path, _, pos2_x = load_and_crop_image(theta2_str, roughness2_str, 'right', 'right')
 
